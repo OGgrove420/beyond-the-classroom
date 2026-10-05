@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "name": "beyond-the-classroom",
+  "framework": null,
+  "routes": [
+    { "src": "/style.css", "dest": "/public/style.css" },
+    { "src": "/app.js", "dest": "/public/app.js" },
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/(.*)", "dest": "/public/index.html" }
+  ]
+}

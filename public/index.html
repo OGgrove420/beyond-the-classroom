@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond The Classroom — Different Pace. Same Potential.</title>
+<meta name="description" content="An adaptive online learning platform for learners who do not thrive in the traditional classroom. The learner doesn't have to fit the system. The system adapts to the learner.">
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%236d5df6'/%3E%3Ctext x='50' y='66' font-size='46' text-anchor='middle' fill='white' font-family='Arial'%3EB%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <div class="brand"><span class="logo">B</span> <b>Beyond The Classroom</b></div>
+    <nav class="links">
+      <a href="#" data-view="home" class="navlink active">home</a>
+      <a href="#" data-view="learner" class="navlink">learner</a>
+      <a href="#" data-view="parent" class="navlink">parent</a>
+      <a href="#" data-view="pricing" class="navlink">pricing</a>
+    </nav>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer>
+  <div>Beyond The Classroom — a Conscious Mind Concepts project.</div>
+  <div class="dim">test build with demo data · not a registered school · supplementary online learning support only</div>
+</footer>
+
+<script>
+window.SITE = null;
+async function loadSite(){
+  if (window.SITE) return window.SITE;
+  const r = await fetch('/api/site');
+  window.SITE = await r.json();
+  return window.SITE;
+}
+</script>
+<script src="/app.js"></script>
+</body>
+</html>

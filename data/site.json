@@ -1,0 +1,67 @@
+{
+  "brand": {
+    "name": "Beyond The Classroom",
+    "tagline": "Different Pace. Same Potential.",
+    "philosophy": "The learner doesn't have to fit the system. The system adapts to the learner.",
+    "company": "Conscious Mind Concepts (Pty) Ltd"
+  },
+  "tiers": [
+    {
+      "id": "discover", "name": "Discover", "price": 0, "accent": "grey",
+      "blurb": "A taste of the platform. Free, forever.",
+      "features": ["Selected lessons", "Basic assessments", "Sample worksheets", "Learning-style assessment", "Limited videos", "Progress tracking"]
+    },
+    {
+      "id": "foundation", "name": "Foundation", "price": 299, "accent": "green",
+      "blurb": "Structured learning for the whole family.",
+      "features": ["Online learning platform", "Core subjects", "Video lessons", "Downloadable worksheets", "Quizzes", "Progress tracking", "Unlimited lesson repetition", "Learner dashboard", "Parent dashboard", "Community support"]
+    },
+    {
+      "id": "plus", "name": "Plus", "price": 599, "accent": "blue", "popular": true,
+      "blurb": "More support. More accountability. More progress.",
+      "features": ["Everything in Foundation", "Personalised learning pathway", "Weekly live group session", "Tutor support", "Monthly progress report", "Additional exercises", "Exam preparation", "Study skills", "Life skills", "Confidence and communication development"]
+    },
+    {
+      "id": "personal", "name": "Personal", "price": 999, "accent": "purple",
+      "blurb": "Considerably more individual attention.",
+      "features": ["Everything in Plus", "Weekly 1-on-1 tutoring", "Individual learning plan", "Monthly parent consultation", "Personalised assessments", "Individual feedback", "Additional revision sessions", "Career exploration", "Personal development coaching"]
+    },
+    {
+      "id": "intensive", "name": "Intensive", "price": 1499, "accent": "gold",
+      "blurb": "A highly supported learning environment. Limited places.",
+      "features": ["Everything in Personal", "Two 1-on-1 sessions per week", "Individual academic support plan", "More frequent assessments", "Parent meetings", "Study planning", "Exam preparation", "Mentorship", "Life skills", "Career guidance"]
+    }
+  ],
+  "subjects": {
+    "academic": ["Mathematics", "English", "Science", "Technology", "Business Studies", "Accounting", "History", "Geography"],
+    "personalDevelopment": ["Mindset", "Confidence", "Emotional regulation", "Communication", "Goal setting", "Decision making", "Problem solving"],
+    "financialEducation": ["Money management", "Saving", "Budgeting", "Understanding debt", "Entrepreneurship", "Investing fundamentals"],
+    "futureSkills": ["AI literacy", "Digital skills", "Communication", "Sales", "Leadership", "Entrepreneurship", "Career preparation"]
+  },
+  "adaptiveMethods": [
+    {"n": 1, "label": "Traditional explanation"},
+    {"n": 2, "label": "Visual explanation"},
+    {"n": 3, "label": "Real-life example"},
+    {"n": 4, "label": "Simplified explanation"},
+    {"n": 5, "label": "Interactive question"}
+  ],
+  "revenueStreams": [
+    {"stream": "Foundation", "zar": "R299/mo"},
+    {"stream": "Plus", "zar": "R599/mo"},
+    {"stream": "Personal", "zar": "R999/mo"},
+    {"stream": "Intensive", "zar": "R1 499/mo"},
+    {"stream": "Individual tutoring", "zar": "R200-R350/session"},
+    {"stream": "Holiday programmes", "zar": "R299-R999"},
+    {"stream": "Exam preparation", "zar": "R499+"},
+    {"stream": "Short courses", "zar": "R99-R499"},
+    {"stream": "Parent workshops", "zar": "R99-R299"},
+    {"stream": "Corporate sponsorships", "zar": "custom"},
+    {"stream": "School partnerships", "zar": "custom"},
+    {"stream": "Sponsor a learner", "zar": "R599/mo"}
+  ],
+  "phases": [
+    {"phase": "Phase 1", "desc": "Online learning and academic support platform"},
+    {"phase": "Phase 2", "desc": "Accredited / recognised online education provider (requires SA registration review)"}
+  ],
+  "disclaimer": "test build with demo data. not a registered school. supplementary online learning support only."
+}
