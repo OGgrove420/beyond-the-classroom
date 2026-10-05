@@ -1,9 +1,10 @@
 """Beyond The Classroom — Vercel Python API (single handler, memory store)."""
-import json, os, random, uuid
+import base64, hashlib, hmac, json, os, random, uuid
 from http.server import BaseHTTPRequestHandler
 
 HERE = os.path.dirname(__file__)
 SITE = json.load(open(os.path.join(HERE, "..", "data", "site.json")))
+SECRET = os.environ.get("BTC_SECRET", "btc-demo-secret-not-for-production")
 
 # in-memory demo state (serverless: fine for a client demo; resets per warm instance)
 PROFILES = {}
@@ -89,20 +90,37 @@ def _json(handler, code, obj):
     handler.end_headers()
     handler.wfile.write(body)
 
+def _grade_token(question_id, answer):
+    msg = f"{question_id}:{answer}".encode()
+    sig = hmac.new(SECRET.encode(), msg, hashlib.sha256).hexdigest()[:16]
+    return base64.urlsafe_b64encode(f"{answer}:{sig}".encode()).decode()
+
+def _check_grade(question_id, token):
+    try:
+        raw = base64.urlsafe_b64decode(token.encode()).decode()
+        answer, sig = raw.split(":", 1)
+        expect = hmac.new(SECRET.encode(), f"{question_id}:{answer}".encode(),
+                          hashlib.sha256).hexdigest()[:16]
+        return int(answer) if hmac.compare_digest(sig, expect) else None
+    except Exception:
+        return None
+
 def _new_quiz():
     qs = random.sample(QUIZ_BANK, min(4, len(QUIZ_BANK)))
+    questions = []
+    for x in qs:
+        qid = str(uuid.uuid4())
+        questions.append({
+            "id": qid,
+            "q": x["q"], "context": x["context"], "options": x["options"],
+            "grade": _grade_token(qid, x["answer"]),
+            "wrong": False, "correct": False, "answeredThisRound": False,
+            "attempts": 0, "firstTry": None,
+        })
     return {
         "topic": qs[0]["topic"].split("·")[0].strip(),
         "idx": 0,
-        "questions": [
-            {
-                "id": str(uuid.uuid4()),
-                "q": x["q"], "context": x["context"], "options": x["options"],
-                "answer": x["answer"], "rewrites": x["rewrites"],
-                "wrong": False, "correct": False, "answeredThisRound": False,
-                "attempts": 0, "firstTry": None,
-            } for x in qs
-        ],
+        "questions": questions,
     }
 
 class handler(BaseHTTPRequestHandler):
@@ -125,11 +143,7 @@ class handler(BaseHTTPRequestHandler):
         if path == "/api/site":
             return _json(self, 200, SITE)
         if path == "/api/quiz":
-            q = _new_quiz()
-            QUIZ_STATE = getattr(self.__class__, "_quiz", None)
-            if not QUIZ_STATE:
-                self.__class__._quiz = q
-            return _json(self, 200, self.__class__._quiz)
+            return _json(self, 200, _new_quiz())
         if path == "/api/parent":
             # demo data, clearly labelled on the page
             return _json(self, 200, {
@@ -159,26 +173,22 @@ class handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/api/quiz/answer":
             b = self._body()
-            quiz = getattr(self.__class__, "_quiz", None)
-            if not quiz:
-                return _json(self, 409, {"error": "no active quiz"})
-            q = next((x for x in quiz["questions"] if x["id"] == b.get("questionId")), None)
-            if not q:
-                return _json(self, 404, {"error": "unknown question"})
-            correct = b.get("choice") == q["answer"]
+            qid = b.get("questionId")
+            answer = _check_grade(qid, b.get("grade", ""))
+            if answer is None:
+                return _json(self, 400, {"error": "invalid grade token"})
+            correct = b.get("choice") == answer
             if correct:
-                if q["firstTry"] is None:
-                    q["firstTry"] = (q["attempts"] == 0)
                 return _json(self, 200, {"correct": True, "praise": random.choice([
                     "nice work. on to the next one.",
                     "you've got it. see how trying again works?",
                     "exactly right.",
                 ])})
-            if not q.get("shownRewrite"):
-                q["shownRewrite"] = True
-                shown = q["rewrites"][:3] + [q["rewrites"][3]] if len(q["rewrites"]) > 3 else q["rewrites"][:3]
-                return _json(self, 200, {"correct": False, "rewrites": q["rewrites"][:4]})
-            return _json(self, 200, {"correct": False, "rewrites": []})
+            # wrong: serve a rotating slice of the four rewrites (stateless)
+            qs = next((x for x in QUIZ_BANK if x["q"] == b.get("q")), None)
+            rewrites = (qs or {}).get("rewrites", [])
+            seen = int(b.get("seen", 0))
+            return _json(self, 200, {"correct": False, "rewrites": rewrites[seen:seen+2] or rewrites[:2]})
         if path == "/api/profile":
             b = self._body()
             pid = str(uuid.uuid4())[:8]

@@ -162,6 +162,7 @@ async function renderQuiz(site){
   if(!quizState){
     const r = await fetch('/api/quiz');
     quizState = await r.json();
+    quizState.methodNames = site.adaptiveMethods.map(m=>`method ${m.n} — ${m.label}`);
   }
   paintQuiz(site);
 }
@@ -190,7 +191,6 @@ function paintQuiz(site){
   }
   const q = qs[quizState.idx];
   const pct = Math.round((quizState.idx / qs.length) * 100);
-  const showMethods = q.wrong && !q.answeredThisRound;
   $app.innerHTML = `
     <div style="max-width:640px;margin:0 auto">
       <div class="quiz-top">
@@ -205,38 +205,46 @@ function paintQuiz(site){
           ${q.options.map((o,i)=>`
             <button class="ans
               ${q.answeredThisRound && i===q.answerIndex ? (q.correct?'correct':'wrong') : ''}"
-              data-i="${i}" ${q.answeredThisRound?'disabled':''}>${o}</button>`).join('')}
+              data-i="${i}" ${q.correct || (q.answeredThisRound && !q.wrong) ? 'disabled':''}>${o}</button>`).join('')}
         </div>
-        ${q.wrong ? `<div class="retry">
+        ${q.rewrites && q.rewrites.length ? `<div class="retry">
           <h4>let's try that another way</h4>
           <p class="dim">you haven't mastered this concept yet. that's okay. here it is, explained differently:</p>
-          ${site.adaptiveMethods.slice(0,3).map((m,i)=>`
-            <div class="method"><b>method ${m.n} — ${m.label}</b><br><span style="font-size:14px">${q.rewrites[i]}</span></div>`).join('')}
-          ${q.rewrites[3] ? `<div class="method"><b>let's break this into smaller steps</b><br><span style="font-size:14px">${q.rewrites[3]}</span></div>`:''}
+          ${q.rewrites.map((txt,i)=>`
+            <div class="method"><b>${(quizState.methodNames||[])[i]||('method '+(i+1))}</b><br><span style="font-size:14px">${txt}</span></div>`).join('')}
         </div>`:''}
         ${q.correct ? `<div class="retry" style="border-color:var(--brand2);background:rgba(34,211,167,.07)">
           <h4 style="color:var(--brand2)">you've got it</h4><p class="dim">${q.praise||'nice work. on to the next one.'}</p></div>`:''}
       </div>
-      ${q.answeredThisRound ? `<div style="margin-top:16px;text-align:center">
-        <button class="btn" id="nextQ">${quizState.idx+1>=qs.length?'finish lesson':'next question'}</button></div>`:''}
+      <div style="margin-top:16px;text-align:center;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        ${q.correct
+          ? `<button class="btn" id="nextQ">${quizState.idx+1>=qs.length?'finish lesson':'next question'}</button>`
+          : q.answeredThisRound
+            ? `<button class="btn green" id="retryQ">try again — you've got this</button>
+               <button class="btn ghost" id="nextQ">skip for now</button>`
+            : ''}
+      </div>
     </div>`;
   $app.querySelectorAll('.ans').forEach(b=>{
     b.onclick = ()=>{
       const i = +b.dataset.i;
+      if(q.correct) return;
       fetch('/api/quiz/answer',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({questionId:q.id, choice:i})})
+        body:JSON.stringify({questionId:q.id, grade:q.grade, choice:i, q:q.q, seen:(q.rewrites||[]).length})})
         .then(r=>r.json()).then(res=>{
           q.answeredThisRound = true;
-          q.correct = res.correct; q.wrong = !res.correct;
-          q.answerIndex = i; q.rewrites = res.rewrites || []; q.praise = res.praise;
+          q.correct = !!res.correct; q.wrong = !res.correct;
+          q.answerIndex = i; q.praise = res.praise;
           if(res.correct) q.correctCount = (q.correctCount||0)+1;
-          else q.attempts = (q.attempts||0)+1;
+          else { q.attempts = (q.attempts||0)+1; q.rewrites = [...(q.rewrites||[]), ...(res.rewrites||[])]; }
           paintQuiz(site);
         });
     };
   });
   const nx = document.getElementById('nextQ');
   if(nx) nx.onclick = ()=>{ quizState.idx++; paintQuiz(site); };
+  const rq = document.getElementById('retryQ');
+  if(rq) rq.onclick = ()=>{ q.answeredThisRound = false; q.wrong = false; q.answerIndex = -1; paintQuiz(site); };
 }
 
 /* ---------- parent ---------- */
