@@ -12,7 +12,7 @@ a{color:var(--brand2)}
 .nav-inner{max-width:1060px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;flex-wrap:wrap;gap:10px}
 .logo{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--brand);font-weight:800}
 .links{display:flex;gap:6px;flex-wrap:wrap}
-.navlink{color:var(--dim);text-decoration:none;padding:7px 14px;border-radius:999px;font-size:14px}
+.navlink{color:var(--txt);text-decoration:none;padding:7px 14px;border-radius:999px;font-size:14px}
 .navlink.active{background:var(--brand);color:#fff}
 main{max-width:1060px;margin:0 auto;padding:28px 20px 60px}
 footer{border-top:1px solid var(--line);padding:22px;text-align:center;font-size:13px;color:var(--dim)}
@@ -49,8 +49,10 @@ ul.feat li:before{content:"✓";position:absolute;left:0;color:var(--brand2);fon
 .q{margin:18px 0}
 .q label{display:block;font-weight:600;margin-bottom:8px}
 .opts{display:flex;flex-wrap:wrap;gap:8px}
-.opt{border:1px solid var(--line);background:var(--bg2);border-radius:999px;padding:8px 16px;cursor:pointer;font-size:14px}
+.opt{border:1px solid var(--line);background:var(--bg2);border-radius:999px;padding:8px 16px;cursor:pointer;font-size:14px;color:var(--txt);font-family:inherit;-webkit-tap-highlight-color:transparent;overflow-wrap:anywhere;max-width:100%}
+.opt:hover{border-color:var(--brand)}
 .opt.sel{background:var(--brand);border-color:var(--brand);color:#fff}
+button{color:inherit}
 textarea,input[type=text]{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:10px;color:var(--txt);
   padding:11px 13px;font:inherit}
 .profile-out{white-space:pre-wrap;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;font-size:14px}
