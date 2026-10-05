@@ -1,7 +1,10 @@
 {
   "version": 2,
   "name": "beyond-the-classroom",
-  "framework": null,
+  "builds": [
+    { "src": "api/index.py", "use": "@vercel/python" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
   "routes": [
     { "src": "/style.css", "dest": "/public/style.css" },
     { "src": "/app.js", "dest": "/public/app.js" },
