@@ -61,6 +61,17 @@ textarea,input[type=text]{width:100%;background:var(--bg2);border:1px solid var(
 .progress{height:8px;background:var(--bg2);border-radius:999px;overflow:hidden;margin-bottom:22px}
 .progress > div{height:100%;background:var(--brand);width:0%;transition:width .3s}
 .qq{font-size:20px;font-weight:700;margin-bottom:8px}
+/* learning modality tabs (VAK) */
+.modtabs{display:flex;gap:6px;margin:14px 0 10px;flex-wrap:wrap}
+.modtab{flex:1;min-width:90px;border:1px solid var(--line);background:var(--bg2);border-radius:12px;
+  padding:9px 6px;cursor:pointer;font:inherit;font-size:13px;color:var(--dim);text-align:center;
+  -webkit-tap-highlight-color:transparent}
+.modtab:hover{border-color:var(--brand)}
+.modtab.sel{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700}
+.modicon{margin-right:2px}
+.modbody{background:rgba(109,93,246,.07);border:1px dashed var(--line);border-radius:12px;
+  padding:12px 14px;margin-bottom:6px;font-size:14px;color:var(--txt);line-height:1.6}
+.modbody:empty{display:none}
 .answers{display:grid;gap:10px;margin-top:16px}
 .ans{border:1px solid var(--line);background:var(--bg2);border-radius:12px;padding:13px 16px;cursor:pointer;text-align:left;font:inherit;color:var(--txt)}
 .ans:hover{border-color:var(--brand)}

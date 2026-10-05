@@ -3,6 +3,7 @@ const $app = document.getElementById('app');
 let view = 'home';
 let profile = JSON.parse(sessionStorage.getItem('btc_profile') || 'null');
 let quizState = null;
+let modality = sessionStorage.getItem('btc_modality') || 'visual';
 
 function toast(msg){
   let t = document.querySelector('.toast');
@@ -78,9 +79,9 @@ function renderHome(site){
 /* ---------- learner profile ---------- */
 const PQUESTIONS = [
   {k:'grade', q:'what grade are you in?', type:'text', ph:'e.g. Grade 6'},
-  {k:'enjoy', q:'which subjects do you enjoy?', opts:['Mathematics','English','Science','Technology','Business Studies','Art','History','Geography']},
-  {k:'struggle', q:'which subjects do you struggle with?', opts:['Mathematics','English','Science','Technology','Business Studies','Reading','Writing','Exams']},
-  {k:'style', q:'how do you prefer learning?', opts:['Watching videos','Listening','Reading','Doing practical activities']},
+  {k:'enjoy', q:'which subjects do you enjoy? (choose all that apply)', opts:['Mathematics','English','Science','Technology','Business Studies','Art','History','Geography'], multi:true},
+  {k:'struggle', q:'which subjects do you struggle with? (choose all that apply)', opts:['Mathematics','English','Science','Technology','Business Studies','Reading','Writing','Exams'], multi:true},
+  {k:'style', q:'how do you prefer learning? (choose all that work for you)', opts:['Watching videos','Listening','Reading','Doing practical activities'], multi:true},
   {k:'focus', q:'how long can you comfortably concentrate?', opts:['5–10 minutes','10–20 minutes','20–40 minutes','40+ minutes']},
   {k:'hard', q:'what normally makes learning difficult?', opts:['Going too fast','Too much at once','Not enough explanation','Getting rushed','Fear of getting it wrong','Nothing specific']},
   {k:'strength', q:'what are you good at?', type:'text', ph:'e.g. explaining things to friends, building things, drawing'},
@@ -97,7 +98,7 @@ function renderLearner(site){
         <div class="q">
           <label>${i+1}. ${q.q}</label>
           ${q.opts
-            ? `<div class="opts" data-k="${q.k}">${q.opts.map(o=>`<button class="opt" data-v="${o}">${o}</button>`).join('')}</div>`
+            ? `<div class="opts${q.multi?' multi':''}" data-k="${q.k}" data-multi="${q.multi?1:0}">${q.opts.map(o=>`<button type="button" class="opt" data-v="${o}">${o}</button>`).join('')}</div>`
             : `<input type="text" id="in_${q.k}" placeholder="${q.ph||''}">`}
         </div>`).join('')}
       <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
@@ -108,8 +109,13 @@ function renderLearner(site){
   $app.querySelectorAll('.opts').forEach(g=>{
     g.addEventListener('click', e=>{
       const b = e.target.closest('.opt'); if(!b) return;
-      g.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
-      b.classList.add('sel');
+      const multi = g.dataset.multi === '1';
+      if(multi){
+        b.classList.toggle('sel');
+      } else {
+        g.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
+        b.classList.add('sel');
+      }
     });
   });
   document.getElementById('skipProfile').onclick = ()=>{ go('quiz'); };
@@ -117,8 +123,12 @@ function renderLearner(site){
     const p = {answers:{}, created:new Date().toISOString()};
     for(const q of PQUESTIONS){
       if(q.opts){
-        const sel = $app.querySelector(`.opts[data-k="${q.k}"] .opt.sel`);
-        p.answers[q.k] = sel ? sel.dataset.v : null;
+        if(q.multi){
+          p.answers[q.k] = [...$app.querySelectorAll(`.opts[data-k="${q.k}"] .opt.sel`)].map(x=>x.dataset.v);
+        } else {
+          const sel = $app.querySelector(`.opts[data-k="${q.k}"] .opt.sel`);
+          p.answers[q.k] = sel ? sel.dataset.v : null;
+        }
       } else {
         p.answers[q.k] = (document.getElementById('in_'+q.k)||{}).value || null;
       }
@@ -167,6 +177,52 @@ async function renderQuiz(site){
   paintQuiz(site);
 }
 
+const MODALITIES = [
+  {id:'visual',    icon:'👁', label:'see it'},
+  {id:'audio',     icon:'🎧', label:'hear it'},
+  {id:'kinesthetic', icon:'✋', label:'do it'},
+];
+
+function modalityBody(q, m){
+  if(m==='visual') return q.visual || '';
+  if(m==='kinesthetic') return q.kinesthetic || '';
+  return ''; // audio handled by the player
+}
+
+async function paintAudio(q, m){
+  const box = document.getElementById('modbody');
+  if(!box) return;
+  if(m!=='audio'){ box.innerHTML = modalityBody(q,m) ? `<p>${modalityBody(q,m)}</p>` : '<p class="dim">coming soon for this question.</p>'; return; }
+  box.innerHTML = `<button class="btn green" id="playQ">▶ play the question</button>
+    <div class="dim" style="margin-top:8px" id="audioNote">narrated voice reads the question and every option aloud.</div>
+    <audio id="qaudio" preload="none"></audio>`;
+  document.getElementById('playQ').onclick = async ()=>{
+    const a = document.getElementById('qaudio');
+    const btn = document.getElementById('playQ');
+    btn.disabled = true; btn.textContent = 'loading voice…';
+    try{
+      const r = await fetch(`/api/tts/${q.id}`);
+      if(!r.ok) throw new Error('tts unavailable');
+      const blob = await r.blob();
+      a.src = URL.createObjectURL(blob);
+      a.onended = ()=>{ btn.disabled=false; btn.textContent='▶ play again'; };
+      await a.play();
+      btn.textContent = '⏸ playing…';
+    }catch(err){
+      // browser speech fallback — still audio, still works offline
+      document.getElementById('audioNote').textContent = 'voice engine busy — using your device voice.';
+      try{
+        const u = new SpeechSynthesisUtterance(q.q + '. options: ' + q.options.join('. '));
+        u.onend = ()=>{ btn.disabled=false; btn.textContent='▶ play again'; };
+        speechSynthesis.speak(u);
+      }catch(e2){
+        btn.disabled=false; btn.textContent='▶ play the question';
+        document.getElementById('audioNote').textContent = 'audio unavailable on this device.';
+      }
+    }
+  };
+}
+
 function paintQuiz(site){
   const qs = quizState.questions;
   const done = quizState.idx >= qs.length;
@@ -191,6 +247,7 @@ function paintQuiz(site){
   }
   const q = qs[quizState.idx];
   const pct = Math.round((quizState.idx / qs.length) * 100);
+  if(!MODALITIES.some(m=>m.id===modality)) modality='visual';
   $app.innerHTML = `
     <div style="max-width:640px;margin:0 auto">
       <div class="quiz-top">
@@ -201,6 +258,13 @@ function paintQuiz(site){
       <div class="card">
         <div class="qq">${q.q}</div>
         <p class="dim">${q.context||''}</p>
+        <div class="modtabs">
+          ${MODALITIES.map(m=>`
+            <button class="modtab ${modality===m.id?'sel':''}" data-mod="${m.id}" title="${m.label}">
+              <span class="modicon">${m.icon}</span> ${m.label}
+            </button>`).join('')}
+        </div>
+        <div class="modbody" id="modbody"></div>
         <div class="answers">
           ${q.options.map((o,i)=>`
             <button class="ans
@@ -225,6 +289,14 @@ function paintQuiz(site){
             : ''}
       </div>
     </div>`;
+  $app.querySelectorAll('.modtab').forEach(b=>{
+    b.onclick = ()=>{
+      modality = b.dataset.mod;
+      sessionStorage.setItem('btc_modality', modality);
+      paintQuiz(site);
+    };
+  });
+  paintAudio(q, modality);
   $app.querySelectorAll('.ans').forEach(b=>{
     b.onclick = ()=>{
       const i = +b.dataset.i;
