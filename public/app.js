@@ -4,6 +4,7 @@ let view = 'home';
 let profile = JSON.parse(sessionStorage.getItem('btc_profile') || 'null');
 let quizState = null;
 let modality = sessionStorage.getItem('btc_modality') || 'visual';
+let chosenTier = sessionStorage.getItem('btc_tier') || null;
 
 function toast(msg){
   let t = document.querySelector('.toast');
@@ -20,6 +21,8 @@ async function render(){
   else if(view==='quiz') renderQuiz(site);
   else if(view==='parent') renderParent(site);
   else if(view==='pricing') renderPricing(site);
+  else if(view==='tiers') renderTier(site);
+  else if(view==='offerings') renderOfferings(site);
   document.querySelectorAll('.navlink').forEach(a=>a.classList.toggle('active', a.dataset.view===view));
   window.scrollTo(0,0);
 }
@@ -27,9 +30,10 @@ async function render(){
 /* ---------- home ---------- */
 function renderHome(site){
   const s = site.subjects;
-  const cat = (title, arr) => `
+  const cat = (title, arr, key) => `
     <div class="card"><h3>${title}</h3>
-      <div class="chips">${arr.map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+      <div class="chips">${arr.slice(0,4).map(x=>`<span class="chip">${x}</span>`).join('')}</div>
+      <div style="margin-top:10px"><a class="btn ghost" href="#" data-go="offerings" data-cat="${key}">see all ${arr.length}</a></div>
     </div>`;
   $app.innerHTML = `
     <div class="hero">
@@ -58,10 +62,10 @@ function renderHome(site){
       <h2>beyond school subjects</h2>
       <p class="sub">an alternative education ecosystem, not just lessons.</p>
       <div class="grid">
-        ${cat('academic', s.academic)}
-        ${cat('personal development', s.personalDevelopment)}
-        ${cat('financial education', s.financialEducation)}
-        ${cat('future skills', s.futureSkills)}
+        ${cat('academic', s.academic, 'academic')}
+        ${cat('personal development', s.personalDevelopment, 'personalDevelopment')}
+        ${cat('financial education', s.financialEducation, 'financialEducation')}
+        ${cat('future skills', s.futureSkills, 'futureSkills')}
       </div>
     </div>
     <div class="section">
@@ -88,19 +92,49 @@ const PQUESTIONS = [
   {k:'goal', q:'what do you want to get better at this year?', type:'text', ph:'e.g. maths, confidence, reading'},
 ];
 
+function loadDraft(){
+  try { return JSON.parse(sessionStorage.getItem('btc_draft') || '{}'); }
+  catch(e){ return {}; }
+}
+function saveDraft(d){ sessionStorage.setItem('btc_draft', JSON.stringify(d)); }
+
+/* form selections live in a draft store, not only in DOM classes —
+   a re-render (nav tap, rotate, back nav) can never wipe them again. */
+function collectDraftFromDOM(){
+  const d = loadDraft();
+  for(const q of PQUESTIONS){
+    if(q.opts){
+      const sel = [...$app.querySelectorAll(`.opts[data-k="${q.k}"] .opt.sel`)].map(x=>x.dataset.v);
+      d[q.k] = q.multi ? sel : (sel[0] || null);
+    } else {
+      const el = document.getElementById('in_'+q.k);
+      if(el) d[q.k] = el.value || null;
+    }
+  }
+  saveDraft(d);
+}
+
 function renderLearner(site){
   if(profile){ return renderProfileCard(site); }
+  const draft = loadDraft();
   $app.innerHTML = `
     <div class="hero"><h1>build your learner profile</h1>
-      <p class="phi">we don't just ask "what grade are you in?". we ask how you learn — so the platform can adapt to you.</p></div>
+      <p class="phi">we don't just ask "what grade are you in?". we ask how you learn — so the platform can adapt to you.</p>
+      ${chosenTier?`<p class="sub">you're signing up for the <b>${chosenTier.name}</b> tier (${zar(chosenTier.price)}/month) — the profile tells us where to start.</p>`:''}
+    </div>
     <div class="card" style="max-width:640px;margin:22px auto 0">
-      ${PQUESTIONS.map((q,i)=>`
+      ${PQUESTIONS.map((q,i)=>{
+        const val = draft[q.k] !== undefined ? draft[q.k] : null;
+        return `
         <div class="q">
           <label>${i+1}. ${q.q}</label>
           ${q.opts
-            ? `<div class="opts${q.multi?' multi':''}" data-k="${q.k}" data-multi="${q.multi?1:0}">${q.opts.map(o=>`<button type="button" class="opt" data-v="${o}">${o}</button>`).join('')}</div>`
-            : `<input type="text" id="in_${q.k}" placeholder="${q.ph||''}">`}
-        </div>`).join('')}
+            ? `<div class="opts${q.multi?' multi':''}" data-k="${q.k}" data-multi="${q.multi?1:0}">${q.opts.map(o=>{
+                const sel = q.multi ? (val||[]).includes(o) : (val===o);
+                return `<button type="button" class="opt${sel?' sel':''}" data-v="${o}">${o}</button>`;
+              }).join('')}</div>`
+            : `<input type="text" id="in_${q.k}" placeholder="${q.ph||''}" value="${val||''}">`}
+        </div>`;}).join('')}
       <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" id="saveProfile">create my profile</button>
         <button class="btn ghost" id="skipProfile">skip for now</button>
@@ -116,53 +150,89 @@ function renderLearner(site){
         g.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
         b.classList.add('sel');
       }
+      collectDraftFromDOM();          // persist every tap immediately
     });
+  });
+  $app.querySelectorAll('input[type=text]').forEach(el=>{
+    el.addEventListener('input', collectDraftFromDOM);
   });
   document.getElementById('skipProfile').onclick = ()=>{ go('quiz'); };
   document.getElementById('saveProfile').onclick = ()=>{
-    const p = {answers:{}, created:new Date().toISOString()};
-    for(const q of PQUESTIONS){
-      if(q.opts){
-        if(q.multi){
-          p.answers[q.k] = [...$app.querySelectorAll(`.opts[data-k="${q.k}"] .opt.sel`)].map(x=>x.dataset.v);
-        } else {
-          const sel = $app.querySelector(`.opts[data-k="${q.k}"] .opt.sel`);
-          p.answers[q.k] = sel ? sel.dataset.v : null;
-        }
-      } else {
-        p.answers[q.k] = (document.getElementById('in_'+q.k)||{}).value || null;
-      }
-    }
+    collectDraftFromDOM();
+    const d = loadDraft();
+    const p = {answers:d, created:new Date().toISOString(), tier:chosenTier?chosenTier.id:null};
+    const btn = document.getElementById('saveProfile');
+    btn.disabled = true; btn.textContent = 'saving…';
     fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
-      .then(r=>r.json()).then(res=>{
+      .then(r=>{
+        if(!r.ok) throw new Error('server said '+r.status);
+        return r.json();
+      })
+      .then(res=>{
         p.id = res.id;
         profile = p;
         sessionStorage.setItem('btc_profile', JSON.stringify(p));
+        sessionStorage.removeItem('btc_draft');
         toast('profile saved');
         renderProfileCard(site);
+      })
+      .catch(err=>{
+        btn.disabled = false; btn.textContent = 'create my profile';
+        toast('could not save — check your connection and try again. your choices are kept.');
+        console.error('profile save failed:', err);
       });
   };
 }
 
 async function renderProfileCard(site){
-  const r = await fetch(profile.id ? `/api/profile?id=${encodeURIComponent(profile.id)}` : '/api/profile');
-  const data = await r.json();
+  let data;
+  try {
+    const r = await fetch(profile.id ? `/api/profile?id=${encodeURIComponent(profile.id)}` : '/api/profile');
+    data = await r.json();
+  } catch(e) {
+    data = {summary:'(offline — saved profile shown from this device)', tags:['saved'], offline:true};
+  }
+  const a = profile.answers || {};
+  const picked = (label, v) => {
+    if(!v || (Array.isArray(v) && !v.length)) return '';
+    const vals = Array.isArray(v) ? v : [v];
+    return `<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+      <span class="dim">${label}</span><span style="text-align:right;max-width:60%">${vals.join(', ')}</span></div>`;
+  };
   $app.innerHTML = `
-    <div class="hero"><h1>learning profile</h1></div>
+    <div class="hero"><h1>learning profile</h1>
+      ${chosenTier?`<p class="sub">tier: <b>${chosenTier.name}</b> — ${zar(chosenTier.price)}/month</p>`:''}
+    </div>
     <div class="card" style="max-width:640px;margin:0 auto">
       <h3>here's what we learned about how you learn</h3>
       <div class="profile-out">${data.summary}</div>
+      <h3 style="margin-top:18px">your choices</h3>
+      ${picked('grade', a.grade)}
+      ${picked('enjoys', a.enjoy)}
+      ${picked('needs repetition in', a.struggle)}
+      ${picked('learns best by', a.style)}
+      ${picked('focus window', a.focus)}
+      ${picked('finds learning hard when', a.hard)}
+      ${picked('strengths', a.strength)}
+      ${picked('this year\'s goal', a.goal)}
       <div class="chips" style="margin-top:14px">
         ${data.tags.map(t=>`<span class="chip">${t}</span>`).join('')}
       </div>
       <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
         <a class="btn green" href="#" data-go="quiz">start a lesson</a>
+        <button class="btn ghost" id="editProfile">change my answers</button>
         <button class="btn ghost" id="newProfile">start over</button>
       </div>
     </div>`;
   document.getElementById('newProfile').onclick = ()=>{
-    profile = null; sessionStorage.removeItem('btc_profile');
+    profile = null; sessionStorage.removeItem('btc_profile'); sessionStorage.removeItem('btc_draft');
     fetch('/api/profile',{method:'DELETE'}).catch(()=>{});
+    render();
+  };
+  document.getElementById('editProfile').onclick = ()=>{
+    // answers go back into the draft so the form reopens filled in
+    saveDraft(a);
+    profile = null; sessionStorage.removeItem('btc_profile');
     render();
   };
 }
@@ -310,7 +380,8 @@ function paintQuiz(site){
           if(res.correct) q.correctCount = (q.correctCount||0)+1;
           else { q.attempts = (q.attempts||0)+1; q.rewrites = [...(q.rewrites||[]), ...(res.rewrites||[])]; }
           paintQuiz(site);
-        });
+        })
+        .catch(()=>toast('network hiccup — tap your answer again.'));
     };
   });
   const nx = document.getElementById('nextQ');
@@ -346,26 +417,33 @@ async function renderParent(site){
         ${d.insights.map(i=>`<div class="card"><h3>${i.title}</h3><p>${i.body}</p></div>`).join('')}
       </div>
     </div>
-    <div class="note">demo data — this is a test build. reports become real as learners use the platform. tier tiers include a monthly parent consultation from Plus upward.</div>
+    <div class="note">demo data — this is a test build. reports become real as learners use the platform. tiers from Plus upward include a monthly parent consultation.</div>
   `;
 }
 
 /* ---------- pricing ---------- */
+function tierCard(x, site){
+  return `
+    <div class="card" style="${x.popular?'border-color:var(--brand2);box-shadow:0 0 30px rgba(34,211,167,.12)':''}">
+      ${x.popular?'<span class="pill pop">most popular</span>':x.id==='discover'?'<span class="pill grey">free forever</span>':''}
+      <h3 style="margin-top:8px">${x.name}</h3>
+      <div class="price">${zar(x.price)}<small>/month</small></div>
+      <p>${x.blurb}</p>
+      <ul class="feat">${x.features.slice(0,5).map(f=>`<li>${f}</li>`).join('')}${x.features.length>5?`<li class="dim">+ ${x.features.length-5} more — see full tier</li>`:''}</ul>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn ${x.popular?'':'ghost'}" href="#" data-go="tiers" data-tier="${x.id}">full details</a>
+        <a class="btn ${x.popular?'green':''}" href="#" data-go="learner" data-pick="${x.id}">choose ${x.name}</a>
+      </div>
+    </div>`;
+}
+
 function renderPricing(site){
   const t = site.tiers;
   $app.innerHTML = `
     <div class="hero"><h1>simple monthly tiers</h1>
       <p class="phi">start free. scale support when you need it. cancel anytime.</p></div>
     <div class="grid">
-      ${t.map(x=>`
-        <div class="card" style="${x.popular?'border-color:var(--brand2);box-shadow:0 0 30px rgba(34,211,167,.12)':''}">
-          ${x.popular?'<span class="pill pop">most popular</span>':x.id==='discover'?'<span class="pill grey">free forever</span>':''}
-          <h3 style="margin-top:8px">${x.name}</h3>
-          <div class="price">${zar(x.price)}<small>/month</small></div>
-          <p>${x.blurb}</p>
-          <ul class="feat">${x.features.map(f=>`<li>${f}</li>`).join('')}</ul>
-          <div style="margin-top:14px"><a class="btn ${x.popular?'':'ghost'}" href="#" data-go="learner">choose ${x.name}</a></div>
-        </div>`).join('')}
+      ${t.map(x=>tierCard(x, site)).join('')}
     </div>
     <div class="section">
       <h2>beyond the tiers</h2>
@@ -378,16 +456,118 @@ function renderPricing(site){
   `;
 }
 
+/* ---------- tier detail pages ---------- */
+function renderTier(site){
+  const x = site.tiers.find(t=>t.id===view)
+    || site.tiers.find(t=>t.id===(history.state&&history.state.tier));
+  if(!x){ view='pricing'; return renderPricing(site); }
+  const idx = site.tiers.indexOf(x);
+  const prev = site.tiers[idx-1], next = site.tiers[idx+1];
+  $app.innerHTML = `
+    <div class="hero">
+      <div class="tag">tier ${idx+1} of ${site.tiers.length}</div>
+      <h1>${x.name}</h1>
+      <div class="price" style="font-size:44px">${zar(x.price)}<small>/month</small></div>
+      <p class="phi">${x.blurb}</p>
+      <div class="cta-row">
+        <a class="btn green" href="#" data-go="learner" data-pick="${x.id}">choose ${x.name}</a>
+        <a class="btn ghost" href="#" data-go="pricing">compare all tiers</a>
+      </div>
+    </div>
+    <div class="card" style="max-width:640px;margin:0 auto">
+      <h3>everything in ${x.name}</h3>
+      <ul class="feat">${x.features.map(f=>`<li>${f}</li>`).join('')}</ul>
+      ${next?`<div style="margin-top:16px" class="dim">need more? <a href="#" data-go="tiers" data-tier="${next.id}" style="color:var(--brand)">${next.name}</a> adds: ${next.features.filter(f=>!x.features.includes(f)).slice(0,3).join(', ')}…</div>`:''}
+    </div>
+    <div style="margin-top:16px;display:flex;justify-content:space-between;max-width:640px;margin-left:auto;margin-right:auto">
+      ${prev?`<a class="btn ghost" href="#" data-go="tiers" data-tier="${prev.id}">← ${prev.name}</a>`:'<span></span>'}
+      ${next?`<a class="btn ghost" href="#" data-go="tiers" data-tier="${next.id}">${next.name} →</a>`:'<span></span>'}
+    </div>
+    <div class="note">demo pricing for a test build. cancel anytime. every tier includes the 3-way lessons: see it, hear it, do it.</div>
+  `;
+}
+
+/* ---------- offerings (full subject catalogue) ---------- */
+const CAT_META = {
+  academic: {label:'academic subjects', blurb:'the school subjects, taught the adaptive way — every lesson in all three modalities.'},
+  personalDevelopment: {label:'personal development', blurb:'the stuff school skips: mindset, confidence, emotional regulation.'},
+  financialEducation: {label:'financial education', blurb:'money skills for life — budgeting, saving, debt, building something of your own.'},
+  futureSkills: {label:'future skills', blurb:'what the next decade actually rewards: AI literacy, digital skills, selling, leading.'},
+};
+
+function renderOfferings(site){
+  const s = site.subjects;
+  const draft = loadDraft();
+  const wantsHelp = draft.struggle || [];
+  $app.innerHTML = `
+    <div class="hero"><h1>everything we offer</h1>
+      <p class="phi">an alternative education ecosystem, not just lessons.</p></div>
+    ${Object.keys(CAT_META).map(key=>{
+      const meta = CAT_META[key];
+      const arr = s[key] || [];
+      return `
+      <div class="section" id="cat-${key}">
+        <h2>${meta.label}</h2>
+        <p class="sub">${meta.blurb}</p>
+        <div class="grid">
+          ${arr.map(name=>{
+            const flagged = wantsHelp.includes(name);
+            return `<div class="card" ${flagged?'style="border-color:var(--brand2)"':''}>
+              <h3>${name}</h3>
+              <p class="dim">${flagged?'your profile flagged this — the adaptive loop gives it extra attention.':'taught with visual, audio and hands-on paths in every lesson.'}</p>
+            </div>`;}).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+    <div class="section">
+      <h2>how subjects are taught</h2>
+      <div class="grid">
+        <div class="card"><h3>👁 see it</h3><p>mind-picture walkthroughs on every question.</p></div>
+        <div class="card"><h3>🎧 hear it</h3><p>the whole question and options read aloud — real narrated voice.</p></div>
+        <div class="card"><h3>✋ do it</h3><p>hands-on activities: paper folds, coins, acting it out.</p></div>
+      </div>
+    </div>
+    <div class="section">
+      <h2>beyond the tiers</h2>
+      <table>
+        <tr><th>extra offering</th><th>pricing</th></tr>
+        ${site.revenueStreams.filter(r=>!site.tiers.some(t=>t.name===r.stream)).map(r=>`<tr><td>${r.stream}</td><td>${r.zar}</td></tr>`).join('')}
+      </table>
+    </div>
+    <div class="cta-row" style="text-align:center">
+      <a class="btn" href="#" data-go="learner">match these to my learner</a>
+      <a class="btn green" href="#" data-go="pricing">see tier pricing</a>
+    </div>
+    <div class="note">demo catalogue for a test build — subject availability grows with each phase.</div>
+  `;
+}
+
 /* ---------- routing ---------- */
-function go(v){
+function go(v, opts){
   if(v==='quiz' && !quizState) view='quiz'; else view=v;
+  if(opts && opts.tier){ history.replaceState({tier:opts.tier}, ''); }
   render();
 }
 document.addEventListener('click', e=>{
   const a = e.target.closest('[data-go]');
-  if(a){ e.preventDefault(); go(a.dataset.go); }
+  if(!a) return;
+  e.preventDefault();
+  // pricing: remember which tier the learner picked
+  const pickId = a.dataset.pick;
+  if(pickId){
+    // site.json is already loaded by the time anything renders
+    loadSite().then(site=>{
+      chosenTier = site.tiers.find(t=>t.id===pickId) || null;
+      sessionStorage.setItem('btc_tier', JSON.stringify(chosenTier));
+      go(a.dataset.go);
+    });
+    return;
+  }
+  go(a.dataset.go, {tier:a.dataset.tier});
 });
 document.querySelectorAll('.navlink').forEach(a=>{
   a.onclick = e=>{ e.preventDefault(); view=a.dataset.view; if(a.dataset.view==='quiz'&&!quizState) view='quiz'; render(); };
 });
+// restore chosen tier on reload
+try { chosenTier = JSON.parse(sessionStorage.getItem('btc_tier') || 'null'); } catch(e){ chosenTier = null; }
 render();
