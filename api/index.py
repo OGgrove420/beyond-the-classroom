@@ -1,10 +1,19 @@
 """Beyond The Classroom — Vercel Python API (single handler, memory store)."""
 import base64, hashlib, hmac, json, os, random, re, time, urllib.parse, urllib.request, uuid
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 
 HERE = os.path.dirname(__file__)
+import sys
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
 SITE = json.load(open(os.path.join(HERE, "..", "data", "site.json")))
 SECRET = os.environ.get("BTC_SECRET", "btc-demo-secret-not-for-production")
+
+import grades as _grades
+import question_bank as _qbank
+import payments as _pay
 
 # in-memory demo state (serverless: fine for a client demo; resets per warm instance)
 PROFILES = {}
@@ -61,113 +70,6 @@ def _chunk_text(text, limit=180):
     return chunks
 
 
-QUIZ_BANK = [
-    {
-        "topic": "Mathematics · fractions",
-        "q": "What is 1/2 + 1/4?",
-        "context": "Fractions: different denominators",
-        "options": ["2/6", "3/4", "1/6", "2/4"],
-        "answer": 1,
-        "option_notes": {
-            "0": "2/6 adds the top numbers and the bottom numbers together. But only the top numbers get added. 2/6 is not the answer.",
-            "2": "1/6 is smaller than either fraction you started with. Adding can never make the answer smaller. Not this one.",
-            "3": "2/4 is one half, the same as the first fraction alone. The second quarter has not been added yet.",
-        },
-        "rewrites": [
-            "Think of a pizza cut into 2 pieces. You eat 1 piece. Another pizza is cut into 4 pieces and you eat 1. How much of ONE whole pizza did you eat? Cut the half-pizza into quarters and count: 2 quarters + 1 quarter = 3 quarters.",
-            "Picture a bar split into 4 blocks. 1/2 fills 2 blocks. 1/4 fills 1 block. Together: 3 of the 4 blocks — that is 3/4.",
-            "You have half a sandwich. Your friend gives you a quarter of another. Cut your half into two quarters. Now you hold 3 quarters of a sandwich: 3/4.",
-            "Step 1: make the bottoms the same. 1/2 = 2/4. Step 2: add the tops. 2/4 + 1/4 = 3/4.",
-        ],
-        "visual": "Look at this picture: ◼◼◻◻ is a bar of 4 equal blocks. 1/2 fills the first 2 blocks (◼◼), and 1/4 fills one more (◼). Count the filled blocks: ◼◼◼ = 3 filled out of 4. That is 3/4. Seeing 3 shaded blocks out of 4 total IS the answer.",
-        "kinesthetic": "Take a real piece of paper. Fold it in half, then fold it in half again — you now have 4 equal sections. Tear or cut along one fold so one quarter separates. Put the pieces together on the table: the big half piece plus the small quarter piece. Count the quarter-sections you are holding: 3. So 1/2 + 1/4 = 3/4. You just built the answer with your hands.",
-    },
-    {
-        "topic": "English · parts of speech",
-        "q": "Which word is an adjective? 'The quick fox jumped over the lazy dog.'",
-        "context": "Adjectives describe nouns",
-        "options": ["fox", "jumped", "quick", "over"],
-        "answer": 2,
-        "option_notes": {
-            "0": "Fox is a noun. It names the animal doing the action. Naming words are nouns, not adjectives.",
-            "1": "Jumped is a verb. It is the action the fox did. Action words are verbs.",
-            "3": "Over is a preposition. It is a little connector word showing where. It does not describe a noun.",
-        },
-        "rewrites": [
-            "An adjective is a describing word. Ask: what was the fox like? Quick. 'Quick' describes the fox, so it is the adjective.",
-            "Nouns name things (fox, dog). Verbs are actions (jumped). Little connector words are prepositions (over). The word that paints a picture of a noun — quick — is the adjective.",
-            "Say them out loud: 'a fox', 'a quick fox'. 'Quick' adds detail to 'fox'. Words that add detail like that are adjectives.",
-            "Step 1: find the naming words — fox, dog. Step 2: find the word describing one of them — quick. Step 3: a word that describes a noun is an adjective.",
-        ],
-        "visual": "Picture the sentence as a photo. The fox in your mind's eye: is it running slowly or flashing past in a blur? The blur IS the word 'quick' at work — it paints the picture of the fox. 'Dog' is grey and ordinary; 'lazy' makes the dog droop on a couch. In the photo, the words that add colour and detail to the nouns are the adjectives: quick, lazy.",
-        "kinesthetic": "Act it out. Walk across the room like a QUICK fox — short fast steps. Now walk like a LAZY dog — slow, drooping shoulders. The words that changed HOW you moved are the adjectives: they are the instruction words that told your body what to do. 'Fox' and 'jumped' named who and what they did; 'quick' and 'lazy' told you how to feel it.",
-    },
-    {
-        "topic": "Science · water cycle",
-        "q": "What causes water to evaporate from a dam?",
-        "context": "The water cycle",
-        "options": ["The wind blowing on it", "Heat from the sun", "Fish moving", "Gravity"],
-        "answer": 1,
-        "option_notes": {
-            "0": "Wind moving over water does help a little evaporation. But the main cause, the engine, is heat. Without heat the water would barely evaporate at all.",
-            "2": "Fish moving only stirs the water. Stirring does not turn water into vapour.",
-            "3": "Gravity pulls water down and keeps the dam full. It does the opposite of evaporation.",
-        },
-        "rewrites": [
-            "Leave a glass of water on a sunny windowsill. Days later the level drops. The sun's heat turned some water into invisible vapour that floated away. That is evaporation.",
-            "Heat gives water particles energy. They move faster and faster until they escape the surface into the air. The sun is the heat source, so the sun causes evaporation.",
-            "A kettle on a stove steams because of heat. A dam is a giant kettle sitting on a stove called the sun — no lid, so the steam just rises.",
-            "Step 1: evaporation = liquid turning into gas. Step 2: turning into gas needs energy. Step 3: the sun supplies that energy to the dam.",
-        ],
-        "visual": "Draw it: a blue dam, a yellow sun, wiggly heat rays coming down, and tiny dotted arrows rising off the water into the sky. The dotted arrows are the escaping water vapour. Follow the arrows backwards — they all start where the heat rays hit the water. The picture shows it: sun heat in, vapour out.",
-        "kinesthetic": "Try this: lick the back of your hand and blow on it gently — it feels cool as the water lifts off your skin. Now cup your palm in front of your mouth and breathe on it — warm and damp. Your breath is heat; the dampness on your hand is water leaving the surface as vapour. You just made a tiny dam on your own hand. Heat made the water leave. Bigger heat, bigger dam: the sun.",
-    },
-    {
-        "topic": "Financial education · budgeting",
-        "q": "You earn R500. You spend R350 on data and R200 on a gift. What is the balance?",
-        "context": "Money in, money out",
-        "options": ["R50 left", "-R50 (R50 short)", "R150 left", "R0"],
-        "answer": 1,
-        "option_notes": {
-            "0": "R50 left forgets the gift. After data you have R150, but the gift costs R200, which is more than R150.",
-            "2": "R150 left is what remains after data only. The gift of R200 has not been paid yet, and R150 cannot cover R200.",
-            "3": "R0 would mean everything balances exactly. But the spending, R550, is more than the income, R500. It does not balance.",
-        },
-        "rewrites": [
-            "Think of a wallet with R500. Pay R350 for data — R150 left. The gift costs R200 but the wallet only has R150. You are R50 short. Balance: -R50.",
-            "Money in: +500. Money out: 350 + 200 = 550. In minus out: 500 - 550 = -50. A negative balance means you spent more than you earned.",
-            "Like a scale: R500 of income on one side, R550 of spending on the other. The spending side is heavier by R50 — you tipped R50 into debt.",
-            "Step 1: add spending: 350 + 200 = 550. Step 2: subtract from income: 500 - 550. Step 3: 550 is bigger, so the answer is -50 — R50 short.",
-        ],
-        "visual": "Two jars on a table. The IN jar gets 5 R100 notes. The OUT jar needs 3.5 for data (imagine 3 full notes and a half) plus 2 for the gift. Count the OUT jar: 5.5 notes against the IN jar's 5. The OUT jar is half a note heavier. That missing half is the shortfall: -R50. The picture of two uneven jars is the whole story.",
-        "kinesthetic": "Grab 5 small objects — coins, buttons, anything. That is your R500 (each = R100). Pay for data: put 3 objects and 'half' of another to one side (R350). Pay for the gift: 2 more to that side (R200). Look at your hand: you still owe half an object. That empty half-space in your hand is -R50 — you feel the shortfall because your hand came up short.",
-    },
-    {
-        "topic": "Study skills · memory",
-        "q": "Which study method is most likely to make facts stick?",
-        "context": "How memory works",
-        "options": [
-            "Reading the page 5 times in a row",
-            "Highlighting everything important",
-            "Testing yourself, then re-studying what you missed",
-            "Studying everything the night before",
-        ],
-        "answer": 2,
-        "option_notes": {
-            "0": "Reading the page five times in a row only makes the page feel familiar. Familiar is not the same as remembered.",
-            "1": "Highlighting everything highlights nothing. When everything is marked important, your brain learns no difference.",
-            "3": "The night before works for one morning, then fades in days. It crams, it does not stick.",
-        },
-        "rewrites": [
-            "Your brain keeps what it has to FETCH, not what it only looks at. Self-testing is fetching. Reading five times is just looking. That is why the test-then-fix loop sticks.",
-            "Picture memory as a muscle: it grows when it works, not when it watches. Testing yourself is the workout. Highlighting is stretching in front of the TV.",
-            "Like learning to ride a bike: you fall (get it wrong), adjust, try again. That fall-and-fix loop is exactly what self-testing does for facts.",
-            "Step 1: try to recall without looking — this is the effort that builds memory. Step 2: check. Step 3: restudy only the misses. Repeat.",
-        ],
-        "visual": "Picture two paths to the same fact across a field. Path 1: you are driven along it 5 times in a car (re-reading) — you recognise the view but could not walk it alone. Path 2: you walk it once on foot, take a wrong turn, correct yourself (self-testing). Now YOU own that path — your feet made the map. Self-testing is walking the path; the walk is what draws the map in your brain.",
-        "kinesthetic": "Close the page right now and say the answer out loud from memory — yes, really. That tiny struggle you just felt, reaching for it? THAT feeling is your brain building the memory. Compare it to reading the page again: easy, smooth, nothing gained. The strain of reaching is the workout. Test, check, restudy the misses — that is the whole method, and you just did one rep.",
-    },
-]
 
 def _json(handler, code, obj):
     body = json.dumps(obj).encode()
@@ -183,6 +85,15 @@ def _grade_token(question_id, answer):
     sig = hmac.new(SECRET.encode(), msg, hashlib.sha256).hexdigest()[:16]
     return base64.urlsafe_b64encode(f"{answer}:{sig}".encode()).decode()
 
+
+def res_bank_q(question_text):
+    """find a bank question by its text, across all bands."""
+    for band, qs in _qbank.BANK.items():
+        for x in qs:
+            if x["q"] == question_text:
+                return x
+    return None
+
 def _check_grade(question_id, token):
     try:
         raw = base64.urlsafe_b64decode(token.encode()).decode()
@@ -193,8 +104,16 @@ def _check_grade(question_id, token):
     except Exception:
         return None
 
-def _new_quiz():
-    qs = random.sample(QUIZ_BANK, min(4, len(QUIZ_BANK)))
+def _new_quiz(grade_text=None):
+    """build a quiz from the learner's grade band.
+
+    band -> question bank + intensity (gentle/standard/stretch/exam).
+    no grade -> intermediate (the default band)."""
+    info = _grades.grade_info(grade_text) if grade_text else None
+    band = info["band"] if info else "intermediate"
+    intensity = info["intensity"] if info else _grades._INTENSITY["intermediate"]
+    pool = _qbank.bank_for_band(band)
+    qs = random.sample(pool, min(3, len(pool)))
     questions = []
     for x in qs:
         qid = str(uuid.uuid4())
@@ -204,6 +123,7 @@ def _new_quiz():
             "grade": _grade_token(qid, x["answer"]),
             "visual": x.get("visual", ""),
             "kinesthetic": x.get("kinesthetic", ""),
+            "subject": x["subject"], "topic": x["topic"],
             "wrong": False, "correct": False, "answeredThisRound": False,
             "attempts": 0, "firstTry": None,
         })
@@ -222,7 +142,11 @@ def _new_quiz():
             cr[f"{qid}:opt:{oi}"] = f"You chose {opt_name}. {note}"
         TTS_REGISTRY.update(cr)
     return {
-        "topic": qs[0]["topic"].split("·")[0].strip(),
+        "topic": f"{band} band",
+        "band": band,
+        "band_label": info["band_label"] if info else "intermediate phase (grades 4-7)",
+        "intensity": intensity["label"],
+        "intensity_desc": intensity["desc"],
         "idx": 0,
         "questions": questions,
     }
@@ -266,7 +190,37 @@ class handler(BaseHTTPRequestHandler):
                 },
             })
         if path == "/api/quiz":
-            return _json(self, 200, _new_quiz())
+            qgrade = (self.path.split("grade=") + [""])[1].split("&")[0]
+            qgrade = urllib.parse.unquote_plus(qgrade) if qgrade else None
+            return _json(self, 200, _new_quiz(qgrade))
+        if path == "/api/grades":
+            # what each grade band means — for the profile screen copy
+            return _json(self, 200, {
+                "bands": [
+                    {"band": b, "label": lbl, "intensity": _grades._INTENSITY[b]["label"],
+                     "desc": _grades._INTENSITY[b]["desc"]}
+                    for rng, b, lbl in _grades._BANDS
+                ]})
+        if path == "/api/pay/quote":
+            tid = (self.path.split("tier=") + [""])[1].split("&")[0]
+            t = _pay.tier_by_id(urllib.parse.unquote_plus(tid))
+            if not t:
+                return _json(self, 404, {"error": "unknown tier"})
+            if t["price"] <= 0:
+                return _json(self, 200, {"tier": t["id"], "free": True})
+            q = _pay.quote_zar_to_eth(t["price"])
+            return _json(self, 200, {
+                "tier": t["id"], "amount_zar": t["price"],
+                "eth_amount": q["eth"], "eth_zar": q["eth_zar"],
+                "treasury": _pay.TREASURY, "chain_id": _pay.CHAIN_ID,
+                "chain": _pay.CHAIN_NAME,
+                "payfast_ready": _pay.payfast_configured()})
+        if path == "/api/pay/status":
+            oid = (self.path.split("id=") + [""])[1].split("&")[0]
+            o = _pay.ORDERS.get(oid)
+            if not o:
+                return _json(self, 404, {"error": "unknown order"})
+            return _json(self, 200, o)
         if path == "/api/parent":
             # demo data, clearly labelled on the page
             return _json(self, 200, {
@@ -289,7 +243,14 @@ class handler(BaseHTTPRequestHandler):
         if path == "/api/profile":
             pid = (self.path.split("?id=") + [""])[1]
             p = PROFILES.get(pid) or next(iter(PROFILES.values()), None) or DEFAULT_SUMMARY
-            return _json(self, 200, p)
+            # add band + intensity so the profile card can show them
+            grade_text = (p.get("grade") if isinstance(p, dict) else None)
+            info = _grades.grade_info(grade_text) if grade_text else None
+            out = dict(p)
+            if info:
+                out["band"] = info["band"]
+                out["intensity"] = info["intensity"]["label"]
+            return _json(self, 200, out)
         if path.startswith("/api/tts/"):
             return self._tts(path[len("/api/tts/"):])
         _json(self, 404, {"error": "not found"})
@@ -328,6 +289,39 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path == "/api/pay/intent":
+            b = self._body()
+            order, err = _pay.new_order(b.get("tier"), b.get("method", "crypto"))
+            if err:
+                return _json(self, 400, {"error": err})
+            if order["method"] == "payfast":
+                fields, ferr = _pay.payfast_checkout(order, b.get("base_url", ""))
+                if ferr:
+                    return _json(self, 503, {"error": ferr, "order_id": order["id"]})
+                order["payfast"] = fields
+            return _json(self, 200, order)
+        if path == "/api/pay/confirm":
+            b = self._body()
+            o, err = _pay.confirm_order(b.get("order_id"), b.get("tx_hash"))
+            if err:
+                return _json(self, 400, {"error": err})
+            return _json(self, 200, o)
+        if path == "/api/payfast/itn":
+            b = self._body()
+            if not _pay.payfast_configured():
+                return _json(self, 503, {"error": "merchant keys not set"})
+            ok, detail = _pay.payfast_itn_verify(b, os.environ["PAYFAST_PASSPHRASE"])
+            if not ok:
+                return _json(self, 400, {"error": detail})
+            pid = b.get("m_payment_id", "")
+            oid = pid.replace("BTC-", "")
+            o = _pay.ORDERS.get(oid)
+            if o:
+                o["status"] = "complete"
+                o["pf_payment_id"] = b.get("pf_payment_id")
+                o["paid_at"] = datetime.now(_pay.SAST).isoformat()
+                _pay._mirror_supabase(o)
+            return _json(self, 200, {"ok": True})
         if path == "/api/quiz/answer":
             b = self._body()
             qid = b.get("questionId")
@@ -341,16 +335,32 @@ class handler(BaseHTTPRequestHandler):
                     "you've got it. see how trying again works?",
                     "exactly right.",
                 ])})
-            # wrong: serve a rotating slice of the four rewrites (stateless)
-            qs = next((x for x in QUIZ_BANK if x["q"] == b.get("q")), None)
-            rewrites = (qs or {}).get("rewrites", [])
+            # wrong: serve a rotating slice of the bank's rewrites (stateless)
+            rewrites = (res_bank_q(b.get("q")) or {}).get("rewrites", [])
             seen = int(b.get("seen", 0))
             return _json(self, 200, {"correct": False, "rewrites": rewrites[seen:seen+2] or rewrites[:2]})
         if path == "/api/profile":
             b = self._body()
+            answers = b.get("answers", {})
+            grade_text = answers.get("grade")
+            info = _grades.grade_info(grade_text)
+            # guardian/parent co-sign: required, completed together by the
+            # learner + parent or guardian (holder rule)
+            g = b.get("guardian") or {}
+            if not g.get("name") or not g.get("email") or "@" not in (g.get("email") or ""):
+                return _json(self, 400, {
+                    "error": "guardian_missing",
+                    "message": "a parent or guardian must co-sign: guardian name + email required.",
+                })
             pid = str(uuid.uuid4())[:8]
-            summary, tags = summarise(b.get("answers", {}))
-            PROFILES[pid] = {"id": pid, "summary": summary, "tags": tags}
+            summary, tags = summarise(answers)
+            if info:
+                summary += f"\nGrade band: {info['band_label']}. Lessons run at {info['intensity']['label']} intensity — {info['intensity']['desc']}."
+                tags.append(f"{info['intensity']['label']}-intensity")
+            PROFILES[pid] = {"id": pid, "summary": summary, "tags": tags,
+                             "grade": grade_text, "band": info["band"] if info else None,
+                             "guardian": {"name": g.get("name"), "email": g.get("email")},
+                             "guardian_signed_at": datetime.now(_pay.SAST).isoformat()}
             return _json(self, 200, PROFILES[pid])
         _json(self, 404, {"error": "not found"})
 

@@ -72,6 +72,7 @@ async function render(){
   else if(view==='quiz') renderQuiz(site);
   else if(view==='parent') renderParent(site);
   else if(view==='pricing') renderPricing(site);
+  else if(view==='pay') renderPay(site);
   else if(view==='tiers') renderTier(site);
   else if(view==='offerings') renderOfferings(site);
   document.querySelectorAll('.navlink').forEach(a=>a.classList.toggle('active', a.dataset.view===view));
@@ -135,7 +136,8 @@ function renderHome(site){
 
 /* ---------- learner profile ---------- */
 const PQUESTIONS = [
-  {k:'grade', q:'what grade are you in?', type:'text', ph:'e.g. Grade 6'},
+  {k:'grade', q:'what grade are you in?', type:'select', opts:['Grade R','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'],
+   hint:'your grade sets the intensity of every lesson — see the band below'},
   {k:'enjoy', q:'which subjects do you enjoy? (choose all that apply)', opts:['Mathematics','English','Science','Technology','Business Studies','Art','History','Geography'], multi:true},
   {k:'struggle', q:'which subjects do you struggle with? (choose all that apply)', opts:['Mathematics','English','Science','Technology','Business Studies','Reading','Writing','Exams'], multi:true},
   {k:'style', q:'how do you prefer learning? (choose all that work for you)', opts:['Watching videos','Listening','Reading','Doing practical activities'], multi:true},
@@ -156,13 +158,19 @@ function saveDraft(d){ sessionStorage.setItem('btc_draft', JSON.stringify(d)); }
 function collectDraftFromDOM(){
   const d = loadDraft();
   for(const q of PQUESTIONS){
-    if(q.opts){
+    if(q.opts && q.type!=='select'){
       const sel = [...$app.querySelectorAll(`.opts[data-k="${q.k}"] .opt.sel`)].map(x=>x.dataset.v);
       d[q.k] = q.multi ? sel : (sel[0] || null);
     } else {
       const el = document.getElementById('in_'+q.k);
       if(el) d[q.k] = el.value || null;
     }
+  }
+  const gn = document.getElementById('in_gname');
+  const ge = document.getElementById('in_gemail');
+  if(gn || ge){
+    d.guardian = { name: gn ? gn.value : (d.guardian&&d.guardian.name) || null,
+                   email: ge ? ge.value : (d.guardian&&d.guardian.email) || null };
   }
   saveDraft(d);
 }
@@ -195,6 +203,18 @@ function renderLearner(site){
       </div>
       ${PQUESTIONS.map((q,i)=>{
         const val = draft[q.k] !== undefined ? draft[q.k] : null;
+        if(q.type==='select'){
+          return `
+        <div class="q">
+          <label>${i+1}. ${q.q}</label>
+          ${q.hint?`<p class="dim" style="margin:4px 0 8px;font-size:13px">${q.hint}</p>`:''}
+          <select id="in_${q.k}" style="width:100%;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:inherit;font-size:16px">
+            <option value="">— choose your grade —</option>
+            ${q.opts.map(o=>`<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+          </select>
+          <div id="bandbox" style="margin-top:10px"></div>
+        </div>`;
+        }
         return `
         <div class="q">
           <label>${i+1}. ${q.q}</label>
@@ -205,11 +225,43 @@ function renderLearner(site){
               }).join('')}</div>`
             : `<input type="text" id="in_${q.k}" placeholder="${q.ph||''}" value="${val||''}">`}
         </div>`;}).join('')}
+      <div class="q">
+        <label>👩👦 parent or guardian co-sign</label>
+        <p class="dim" style="margin:4px 0 8px">profiles are always created by the learner together with a parent or guardian. they sign off below.</p>
+        <input type="text" id="in_gname" placeholder="parent or guardian's full name" value="${(loadDraft().guardian&&loadDraft().guardian.name)||''}" style="margin-bottom:8px">
+        <input type="email" id="in_gemail" placeholder="parent or guardian's email" value="${(loadDraft().guardian&&loadDraft().guardian.email)||''}">
+      </div>
       <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" id="saveProfile">🚀 create my profile</button>
         <button class="btn ghost" id="skipProfile">skip for now</button>
       </div>
     </div>`;
+  // live band preview under the grade picker
+  const gradeSel = document.getElementById('in_grade');
+  const bandBox = document.getElementById('bandbox');
+  const BANDS = {
+    'Grade R':['foundation','gentle — short sentences, one idea per question, everyday objects'],
+    'Grade 1':['foundation','gentle — short sentences, one idea per question, everyday objects'],
+    'Grade 2':['foundation','gentle — short sentences, one idea per question, everyday objects'],
+    'Grade 3':['foundation','gentle — short sentences, one idea per question, everyday objects'],
+    'Grade 4':['intermediate','standard — clear sentences, two-step problems, mixed examples'],
+    'Grade 5':['intermediate','standard — clear sentences, two-step problems, mixed examples'],
+    'Grade 6':['intermediate','standard — clear sentences, two-step problems, mixed examples'],
+    'Grade 7':['intermediate','standard — clear sentences, two-step problems, mixed examples'],
+    'Grade 8':['senior','stretch — multi-step problems, abstract reasoning, exam-style wording'],
+    'Grade 9':['senior','stretch — multi-step problems, abstract reasoning, exam-style wording'],
+    'Grade 10':['fet','exam register — full exam style, interpretation, mark-weighted'],
+    'Grade 11':['fet','exam register — full exam style, interpretation, mark-weighted'],
+    'Grade 12':['fet','exam register — full exam style, interpretation, mark-weighted'],
+  };
+  const showBand = ()=>{
+    if(!bandBox) return;
+    const b = BANDS[gradeSel && gradeSel.value];
+    bandBox.innerHTML = b
+      ? `<div class="note" style="margin:0;padding:10px 14px">📚 <b>${b[0]} band</b> — lessons run at <b>${b[1]}</b></div>`
+      : '';
+  };
+  if(gradeSel){ gradeSel.addEventListener('change', ()=>{ collectDraftFromDOM(); showBand(); }); showBand(); }
   $app.querySelectorAll('.opts').forEach(g=>{
     g.addEventListener('click', e=>{
       const b = e.target.closest('.opt'); if(!b) return;
@@ -246,7 +298,12 @@ function renderLearner(site){
   document.getElementById('saveProfile').onclick = ()=>{
     collectDraftFromDOM();
     const d = loadDraft();
-    const p = {answers:d, created:new Date().toISOString(), tier:chosenTier?chosenTier.id:null};
+    if(!d.grade){ toast('choose your grade first — it sets your lesson intensity.'); return; }
+    if(!d.guardian || !d.guardian.name || !d.guardian.email || !d.guardian.email.includes('@')){
+      toast('a parent or guardian must co-sign — add their name and email.');
+      return;
+    }
+    const p = {answers:d, guardian:d.guardian, created:new Date().toISOString(), tier:chosenTier?chosenTier.id:null};
     const btn = document.getElementById('saveProfile');
     btn.disabled = true; btn.textContent = 'saving…';
     fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
@@ -299,6 +356,8 @@ async function renderProfileCard(site){
       <div class="profile-out">${data.summary}</div>
       <h3 style="margin-top:18px">your choices</h3>
       ${picked('grade', a.grade)}
+      ${data.band?`<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span class="dim">grade band</span><span style="text-align:right;max-width:60%">${data.band}</span></div>`:''}
+      ${data.intensity?`<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span class="dim">lesson intensity</span><span style="text-align:right;max-width:60%">${data.intensity}</span></div>`:''}
       ${picked('enjoys', a.enjoy)}
       ${picked('needs repetition in', a.struggle)}
       ${picked('learns best by', a.style)}
@@ -306,6 +365,7 @@ async function renderProfileCard(site){
       ${picked('finds learning hard when', a.hard)}
       ${picked('strengths', a.strength)}
       ${picked('this year\'s goal', a.goal)}
+      ${(profile.guardian&&profile.guardian.name)?`<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span class="dim">co-signed by</span><span style="text-align:right;max-width:60%">${profile.guardian.name} ✓</span></div>`:''}
       <div class="chips" style="margin-top:14px">
         ${data.tags.map(t=>`<span class="chip">${t}</span>`).join('')}
       </div>
@@ -332,7 +392,8 @@ async function renderProfileCard(site){
 /* ---------- quiz ---------- */
 async function renderQuiz(site){
   if(!quizState){
-    const r = await fetch('/api/quiz');
+    const g = (profile&&profile.answers&&profile.answers.grade) || null;
+    const r = await fetch('/api/quiz' + (g ? `?grade=${encodeURIComponent(g)}` : ''));
     quizState = await r.json();
     quizState.methodNames = site.adaptiveMethods.map(m=>`method ${m.n} — ${m.label}`);
   }
@@ -467,7 +528,7 @@ function paintQuiz(site){
     <div style="max-width:640px;margin:0 auto">
       <div class="quiz-top">
         <span class="dim">📝 question ${quizState.idx+1} of ${qs.length}</span>
-        <span class="dim">${myChar?`${myChar.emoji} ${myChar.name} is with you`:`${quizState.topic}`}</span>
+        <span class="dim">${quizState.intensity?`📚 ${quizState.band} band · ${quizState.intensity} intensity · `:''}${myChar?`${myChar.emoji} ${myChar.name} is with you`:quizState.topic}</span>
       </div>
       <div class="progress"><div style="width:${pct}%"></div></div>
       ${myChar ? buddySay(myChar.emoji, quizState.idx===0 ? 'hi! i\'m '+myChar.name+'. we\'ll take this one step at a time. 😊' : pickA(['take your time — no rush here.','read it again slowly. i\'m right here.','you\'ve got this. pick the one that feels right.'])) : ''}
@@ -578,6 +639,123 @@ async function renderParent(site){
     </div>
     <div class="note">demo data — this is a test build. reports become real as learners use the platform. tiers from Plus upward include a monthly parent consultation.</div>
   `;
+}
+
+/* ---------- payment choice ---------- */
+let payOrder = null;
+
+async function renderPay(site){
+  const t = site.tiers.find(x=>x.id===(payOrder&&payOrder.tier)) ||
+            site.tiers.find(x=>x.id===(history.state&&history.state.tier));
+  if(!t){ view='pricing'; return renderPricing(site); }
+  if(t.price<=0){
+    toast('the ' + t.name + ' tier is free — nothing to pay.');
+    view='learner'; return renderLearner(site);
+  }
+  $app.innerHTML = `
+    <div class="hero">
+      <div class="tag">step 2 of 2 — pay securely</div>
+      <h1>${t.name} — ${zar(t.price)}<small>/month</small></h1>
+      <p class="phi">worldwide payments: pay by card/EFT (payfast) or crypto (any wallet, anywhere).</p>
+    </div>
+    <div class="card" style="max-width:640px;margin:0 auto">
+      <div id="paychoice" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn" id="pfBtn">💳 payfast — card / instant EFT (ZAR)</button>
+        <button class="btn green" id="cryptoBtn">🪙 crypto — ETH on Robinhood Chain</button>
+      </div>
+      <div id="paybody"><p class="dim">choose how you'd like to pay.</p></div>
+    </div>`;
+  document.getElementById('pfBtn').onclick = ()=>payfastFlow(t);
+  document.getElementById('cryptoBtn').onclick = ()=>cryptoFlow(t);
+}
+
+async function payfastFlow(t){
+  const body = document.getElementById('paybody');
+  body.innerHTML = '<p class="dim">contacting payfast…</p>';
+  try{
+    const r = await fetch('/api/pay/intent',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tier:t.id, method:'payfast', base_url:location.origin})});
+    const d = await r.json();
+    if(!r.ok){
+      body.innerHTML = `<div class="note">💳 payfast is connected and ready on our side — it switches on the moment the merchant account keys go live. until then, crypto works worldwide today.</div>
+        <button class="btn green" id="switchCrypto">🪙 pay with crypto instead</button>`;
+      document.getElementById('switchCrypto').onclick = ()=>cryptoFlow(t);
+      return;
+    }
+    // build and auto-submit the payfast hosted-checkout form
+    const form = document.createElement('form');
+    form.method = 'POST'; form.action = d.payfast.process_url;
+    for(const [k,v] of Object.entries(d.payfast.fields)){
+      const inp = document.createElement('input');
+      inp.type='hidden'; inp.name=k; inp.value=v; form.appendChild(inp);
+    }
+    document.body.appendChild(form); form.submit();
+  }catch(e){
+    body.innerHTML = '<p class="dim">network hiccup — tap payfast again.</p>';
+  }
+}
+
+async function cryptoFlow(t){
+  const body = document.getElementById('paybody');
+  body.innerHTML = '<p class="dim">getting a live ETH quote…</p>';
+  try{
+    const r = await fetch('/api/pay/intent',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tier:t.id, method:'crypto'})});
+    const d = await r.json();
+    if(!r.ok){ body.innerHTML = `<p class="dim">${d.error||'could not start the order.'}</p>`; return; }
+    payOrder = d;
+    body.innerHTML = `
+      <h3>🪙 pay ${d.eth_amount} ETH <span class="dim">(${zar(d.amount_zar)})</span></h3>
+      <p class="dim">network: ${d.chain} (chain id ${d.chain_id}). send native ETH only — tokens sent on other chains cannot be recovered.</p>
+      <label style="font-size:13px">send exactly this to the treasury:</label>
+      <div style="display:flex;gap:8px;align-items:center;margin:8px 0 14px;flex-wrap:wrap">
+        <input readonly value="${d.treasury}" id="treas" style="flex:1;min-width:200px;font-size:13px">
+        <button class="btn ghost" id="copyTreas">📋 copy</button>
+      </div>
+      <label style="font-size:13px">amount (ETH):</label>
+      <div style="display:flex;gap:8px;align-items:center;margin:8px 0 14px;flex-wrap:wrap">
+        <input readonly value="${d.eth_amount}" id="ethamt" style="flex:1;min-width:120px">
+        <button class="btn ghost" id="copyAmt">📋 copy</button>
+      </div>
+      <label style="font-size:13px">after paying, paste your transaction hash:</label>
+      <input id="txhash" placeholder="0x… the tx hash from your wallet" style="margin:8px 0 12px">
+      <button class="btn green" id="confirmTx" style="width:100%">✅ verify my payment</button>
+      <p class="dim" style="margin-top:10px;font-size:12px">for every crypto payment we record the exact date-time, the ETH amount, and the ETH price at that moment — your SARS record. it is stored against the payment permanently.</p>
+      <div id="payresult"></div>`;
+    document.getElementById('copyTreas').onclick = ()=>{ navigator.clipboard.writeText(d.treasury); toast('treasury address copied 📋'); };
+    document.getElementById('copyAmt').onclick = ()=>{ navigator.clipboard.writeText(String(d.eth_amount)); toast('amount copied 📋'); };
+    document.getElementById('confirmTx').onclick = async ()=>{
+      const hash = document.getElementById('txhash').value.trim();
+      const res = document.getElementById('payresult');
+      if(!hash.startsWith('0x') || hash.length < 20){ toast('paste the full transaction hash from your wallet first.'); return; }
+      res.innerHTML = '<p class="dim">reading the chain…</p>';
+      try{
+        const cr = await fetch('/api/pay/confirm',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({order_id:d.id, tx_hash:hash})});
+        const cd = await cr.json();
+        if(!cr.ok){ res.innerHTML = `<div class="note">⚠️ ${cd.error}</div>`; return; }
+        const s = cd.sars || {};
+        res.innerHTML = `
+          <div class="yay"><h4>🎉 payment verified — welcome to ${t.name}!</h4>
+          <p class="dim">sars record saved for this payment:</p>
+          <table style="margin-top:8px">
+            <tr><td class="dim">date & time (SAST)</td><td>${(s.paid_at||'').replace('T',' ').slice(0,19)}</td></tr>
+            <tr><td class="dim">crypto received</td><td><b>${s.crypto_amount} ETH</b></td></tr>
+            <tr><td class="dim">ETH price at payment</td><td>$${s.eth_price_usd_at_payment} (R${s.zar_per_eth_at_payment}/ETH)</td></tr>
+            <tr><td class="dim">value at payment</td><td><b>R${Math.round(s.value_zar_at_payment*100)/100}</b></td></tr>
+            <tr><td class="dim">tx</td><td style="font-size:11px">${cd.tx_hash}</td></tr>
+          </table></div>
+          <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+            <a class="btn green" href="#" data-go="learner">🎒 build the learner profile</a>
+          </div>`;
+        confetti();
+      }catch(e2){
+        res.innerHTML = '<p class="dim">network hiccup — tap verify again.</p>';
+      }
+    };
+  }catch(e){
+    body.innerHTML = '<p class="dim">network hiccup — tap crypto again.</p>';
+  }
 }
 
 /* ---------- pricing ---------- */
@@ -704,14 +882,19 @@ document.addEventListener('click', e=>{
   const a = e.target.closest('[data-go]');
   if(!a) return;
   e.preventDefault();
-  // pricing: remember which tier the learner picked
+  // tier CTAs: priced tiers go to payment, free tier goes to the profile
   const pickId = a.dataset.pick;
   if(pickId){
-    // site.json is already loaded by the time anything renders
     loadSite().then(site=>{
       chosenTier = site.tiers.find(t=>t.id===pickId) || null;
       sessionStorage.setItem('btc_tier', JSON.stringify(chosenTier));
-      go(a.dataset.go);
+      if(chosenTier && chosenTier.price>0){
+        history.replaceState({tier:pickId}, '');
+        view='pay';
+        render();
+      } else {
+        go(a.dataset.go);
+      }
     });
     return;
   }

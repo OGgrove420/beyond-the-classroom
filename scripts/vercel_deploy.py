@@ -15,6 +15,9 @@ FILES = [
     ('public/vendor/supabase.umd.js', 'text/plain; charset=utf-8'),
     ('public/style.css',  'text/plain; charset=utf-8'),
     ('api/index.py',      'text/x-python'),
+    ('api/grades.py',     'text/x-python'),
+    ('api/question_bank.py', 'text/x-python'),
+    ('api/payments.py',   'text/x-python'),
     ('data/site.json',    'application/json'),
     ('vercel.json',       'application/json'),
 ]
@@ -39,10 +42,11 @@ req = urllib.request.Request('https://api.vercel.com/v13/deployments',
                              data=json.dumps(body).encode())
 with urllib.request.urlopen(req, timeout=60) as r:
     dep = json.loads(r.read())
-if 'uid' not in dep:
+did = dep.get('uid') or dep.get('id')
+if not did:
     print('unexpected response:', json.dumps(dep)[:2000])
     raise SystemExit(1)
-uid = dep['uid']
+uid = did
 print('deployment created:', uid, dep.get('url'))
 
 # poll until ready
