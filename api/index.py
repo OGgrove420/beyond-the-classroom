@@ -10,13 +10,16 @@ SECRET = os.environ.get("BTC_SECRET", "btc-demo-secret-not-for-production")
 PROFILES = {}
 TTS_REGISTRY = {}  # question id -> narration text (elevenlabs read-aloud)
 
+# correction audio: same male voice ("Bill") for every wrong-answer correction.
+CORRECTION_VOICE = "pqHfZKP75CvOlQylNhV4"
 
-def _tts_synthesize(text):
+
+def _tts_synthesize(text, voice_id=None):
     """elevenlabs premium when the key exists, free google voice otherwise."""
     key = os.environ.get("ELEVENLABS_API_KEY", "")
     if key:
         req = urllib.request.Request(
-            "https://api.elevenlabs.io/v1/text-to-speech/Xb7hH8MSUJpSbSDYk0k2",
+            "https://api.elevenlabs.io/v1/text-to-speech/%s" % (voice_id or "Xb7hH8MSUJpSbSDYk0k2"),
             data=json.dumps({
                 "text": text[:4500], "model_id": "eleven_turbo_v2_5",
                 "voice_settings": {"stability": 0.55, "similarity_boost": 0.75,
@@ -65,6 +68,11 @@ QUIZ_BANK = [
         "context": "Fractions: different denominators",
         "options": ["2/6", "3/4", "1/6", "2/4"],
         "answer": 1,
+        "option_notes": {
+            "0": "2/6 adds the top numbers and the bottom numbers together. But only the top numbers get added. 2/6 is not the answer.",
+            "2": "1/6 is smaller than either fraction you started with. Adding can never make the answer smaller. Not this one.",
+            "3": "2/4 is one half, the same as the first fraction alone. The second quarter has not been added yet.",
+        },
         "rewrites": [
             "Think of a pizza cut into 2 pieces. You eat 1 piece. Another pizza is cut into 4 pieces and you eat 1. How much of ONE whole pizza did you eat? Cut the half-pizza into quarters and count: 2 quarters + 1 quarter = 3 quarters.",
             "Picture a bar split into 4 blocks. 1/2 fills 2 blocks. 1/4 fills 1 block. Together: 3 of the 4 blocks — that is 3/4.",
@@ -80,6 +88,11 @@ QUIZ_BANK = [
         "context": "Adjectives describe nouns",
         "options": ["fox", "jumped", "quick", "over"],
         "answer": 2,
+        "option_notes": {
+            "0": "Fox is a noun. It names the animal doing the action. Naming words are nouns, not adjectives.",
+            "1": "Jumped is a verb. It is the action the fox did. Action words are verbs.",
+            "3": "Over is a preposition. It is a little connector word showing where. It does not describe a noun.",
+        },
         "rewrites": [
             "An adjective is a describing word. Ask: what was the fox like? Quick. 'Quick' describes the fox, so it is the adjective.",
             "Nouns name things (fox, dog). Verbs are actions (jumped). Little connector words are prepositions (over). The word that paints a picture of a noun — quick — is the adjective.",
@@ -95,6 +108,11 @@ QUIZ_BANK = [
         "context": "The water cycle",
         "options": ["The wind blowing on it", "Heat from the sun", "Fish moving", "Gravity"],
         "answer": 1,
+        "option_notes": {
+            "0": "Wind moving over water does help a little evaporation. But the main cause, the engine, is heat. Without heat the water would barely evaporate at all.",
+            "2": "Fish moving only stirs the water. Stirring does not turn water into vapour.",
+            "3": "Gravity pulls water down and keeps the dam full. It does the opposite of evaporation.",
+        },
         "rewrites": [
             "Leave a glass of water on a sunny windowsill. Days later the level drops. The sun's heat turned some water into invisible vapour that floated away. That is evaporation.",
             "Heat gives water particles energy. They move faster and faster until they escape the surface into the air. The sun is the heat source, so the sun causes evaporation.",
@@ -110,6 +128,11 @@ QUIZ_BANK = [
         "context": "Money in, money out",
         "options": ["R50 left", "-R50 (R50 short)", "R150 left", "R0"],
         "answer": 1,
+        "option_notes": {
+            "0": "R50 left forgets the gift. After data you have R150, but the gift costs R200, which is more than R150.",
+            "2": "R150 left is what remains after data only. The gift of R200 has not been paid yet, and R150 cannot cover R200.",
+            "3": "R0 would mean everything balances exactly. But the spending, R550, is more than the income, R500. It does not balance.",
+        },
         "rewrites": [
             "Think of a wallet with R500. Pay R350 for data — R150 left. The gift costs R200 but the wallet only has R150. You are R50 short. Balance: -R50.",
             "Money in: +500. Money out: 350 + 200 = 550. In minus out: 500 - 550 = -50. A negative balance means you spent more than you earned.",
@@ -130,6 +153,11 @@ QUIZ_BANK = [
             "Studying everything the night before",
         ],
         "answer": 2,
+        "option_notes": {
+            "0": "Reading the page five times in a row only makes the page feel familiar. Familiar is not the same as remembered.",
+            "1": "Highlighting everything highlights nothing. When everything is marked important, your brain learns no difference.",
+            "3": "The night before works for one morning, then fades in days. It crams, it does not stick.",
+        },
         "rewrites": [
             "Your brain keeps what it has to FETCH, not what it only looks at. Self-testing is fetching. Reading five times is just looking. That is why the test-then-fix loop sticks.",
             "Picture memory as a muscle: it grows when it works, not when it watches. Testing yourself is the workout. Highlighting is stretching in front of the TV.",
@@ -184,6 +212,15 @@ def _new_quiz():
         for i, opt in enumerate(x["options"], 1):
             lines.append(f"Option {i}. {opt}")
         TTS_REGISTRY[qid] = "\n".join(lines)
+        # correction registry: per-rewrite and per-option spoken corrections
+        # (same elevenlabs male voice for every correction, per holder spec)
+        cr = {}
+        for i, rw in enumerate(x.get("rewrites", [])):
+            cr[f"{qid}:rw:{i}"] = "Let's try that another way. " + rw
+        for oi, note in (x.get("option_notes") or {}).items():
+            opt_name = x["options"][int(oi)] if int(oi) < len(x["options"]) else "that option"
+            cr[f"{qid}:opt:{oi}"] = f"You chose {opt_name}. {note}"
+        TTS_REGISTRY.update(cr)
     return {
         "topic": qs[0]["topic"].split("·")[0].strip(),
         "idx": 0,
@@ -209,6 +246,25 @@ class handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/api/site":
             return _json(self, 200, SITE)
+        if path == "/api/auth/config":
+            # supabase wired client-side; this tells the front-end which
+            # providers are switched on. until SUPABASE_URL/ANON_KEY env vars
+            # exist on vercel, the gateway shows a friendly "setup" state.
+            # url + anon key are PUBLIC by design (row-level security protects
+            # data), so serving them here is standard supabase practice.
+            surl = os.environ.get("SUPABASE_URL", "")
+            skey = os.environ.get("SUPABASE_ANON_KEY", "")
+            configured = bool(surl) and bool(skey)
+            return _json(self, 200, {
+                "configured": configured,
+                "url": surl if configured else "",
+                "anonKey": skey if configured else "",
+                "providers": {
+                    "google": {"enabled": configured},
+                    "email_password": {"enabled": configured},
+                    "magic_link": {"enabled": configured},
+                },
+            })
         if path == "/api/quiz":
             return _json(self, 200, _new_quiz())
         if path == "/api/parent":
@@ -240,22 +296,26 @@ class handler(BaseHTTPRequestHandler):
 
     # ---- read-aloud: elevenlabs premium voice, cached on disk ----
     def _tts(self, qid_token):
-        """GET /api/tts/<qid> — narrates question + options."""
+        """GET /api/tts/<qid> — narrates question + options.
+           GET /api/tts/<qid>:rw:<n> — narrates correction rewrite n.
+           GET /api/tts/<qid>:opt:<n> — narrates why option n was wrong."""
         import hashlib
-        qid = qid_token.partition("?")[0]
-        text = TTS_REGISTRY.get(qid)
+        key_raw = qid_token.partition("?")[0]
+        # correction keys use a male voice; question narration keeps the default
+        voice = CORRECTION_VOICE if ":rw:" in key_raw or ":opt:" in key_raw else None
+        text = TTS_REGISTRY.get(key_raw)
         if not text:
             return _json(self, 404, {"error": "unknown question"})
         cache_dir = os.environ.get("TTS_CACHE_DIR") or (
             "/tmp/btc-audio" if os.environ.get("VERCEL")
             else os.path.join(HERE, "..", "data", "audio-cache"))
         os.makedirs(cache_dir, exist_ok=True)
-        key = hashlib.sha1(text.encode()).hexdigest()[:20]
-        cpath = os.path.join(cache_dir, f"{key}.mp3")
+        cache_key = hashlib.sha1((voice or "default").encode() + b"|" + text.encode()).hexdigest()[:20]
+        cpath = os.path.join(cache_dir, f"{cache_key}.mp3")
         if os.path.exists(cpath) and os.path.getsize(cpath) > 1000:
             audio = open(cpath, "rb").read()
         else:
-            audio, err = _tts_synthesize(text)
+            audio, err = _tts_synthesize(text, voice_id=voice)
             if err:
                 return _json(self, 503, {"error": err})
             open(cpath, "wb").write(audio)
@@ -329,7 +389,8 @@ def summarise(a):
         lines.append("Strong interest in: " + ", ".join(subs) + ". Use these subjects to build confidence.")
         tags.append("motivated")
     if a.get("hard"):
-        lines.append(f"Difficulty trigger: {a['hard'].lower()}. Platform adjusts pacing and explanation count.")
+        hard = _as_list(a["hard"])
+        lines.append("Difficulty trigger: " + ", ".join(h.lower() for h in hard) + ". Platform adjusts pacing and explanation count.")
         tags.append("paced-for-them")
     if a.get("strength"):
         lines.append(f"Strengths to build on: {a['strength']}.")

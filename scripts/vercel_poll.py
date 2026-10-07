@@ -6,7 +6,7 @@ for line in open('/opt/data/conscious-ecom/.env'):
     if line.startswith('VERCEL_TOKEN='):
         TOKEN = line.split('=', 1)[1].strip().strip('"').strip("'")
 
-UID = 'dpl_9NV6izruh2x97xvEthon3eejrMMW'
+UID = 'dpl_Bp8vFvd9sYvnKjTyQ4apcG11bGFP'
 deadline = time.time() + 240
 state = None
 while time.time() < deadline:

@@ -5,6 +5,32 @@ let profile = JSON.parse(sessionStorage.getItem('btc_profile') || 'null');
 let quizState = null;
 let modality = sessionStorage.getItem('btc_modality') || 'visual';
 let chosenTier = sessionStorage.getItem('btc_tier') || null;
+let accent = sessionStorage.getItem('btc_accent') || null;
+
+/* ---------- prebuilt learning buddies ---------- */
+const CHARACTERS = [
+  {id:'zippy',  name:'zippy',  emoji:'🤖', line:'logic and circuits — loves maths puzzles',        grad:['#6d5df6','#38bdf8']},
+  {id:'luna',   name:'luna',   emoji:'🚀', line:'curious explorer — space and science fan',        grad:['#818cf8','#f472b6']},
+  {id:'pixel',  name:'pixel',  emoji:'🦊', line:'quick thinker — gamer at heart',                  grad:['#fb923c','#f65db4']},
+  {id:'sprout', name:'sprout', emoji:'🌱', line:'grows a little every day — patient learner',      grad:['#22d3a7','#a3e635']},
+  {id:'nova',   name:'nova',   emoji:'⭐', line:'shines bright — confidence builder',              grad:['#f6b73c','#f65d5d']},
+  {id:'bolt',   name:'bolt',   emoji:'🐆', line:'fast brain — likes short, snappy lessons',        grad:['#f6a13c','#f6e05c']},
+  {id:'echo',   name:'echo',   emoji:'🎵', line:'learns through rhythm and sound',                 grad:['#f472b6','#818cf8']},
+  {id:'spark',  name:'spark',  emoji:'⚡', line:'big ideas — energy for days',                     grad:['#38bdf8','#22d3a7']},
+  {id:'booky',  name:'booky',  emoji:'🦉', line:'wise and calm — reads everything twice',          grad:['#7c6ff0','#4c51bf']},
+  {id:'rocky',  name:'rocky',  emoji:'🐐', line:'never gives up — climbs every problem',           grad:['#a78bfa','#22d3a7']},
+  {id:'splash', name:'splash', emoji:'🐬', line:'plays while learning — makes friends easily',     grad:['#22d3ee','#3b82f6']},
+  {id:'dice',   name:'dice',   emoji:'🐼', line:'chill strategist — one move at a time',           grad:['#94a3b8','#334155']},
+];
+const ACCENTS = ['#6d5df6','#22d3a7','#f65db4','#f6a13c','#38bdf8','#a3e635'];
+const charById = id => CHARACTERS.find(c=>c.id===id) || null;
+
+function applyAccent(hex){
+  if(!hex || !ACCENTS.includes(hex)) hex = null;
+  accent = hex;
+  if(hex) sessionStorage.setItem('btc_accent', hex); else sessionStorage.removeItem('btc_accent');
+  document.documentElement.style.setProperty('--brand', hex || '#6d5df6');
+}
 
 function toast(msg){
   let t = document.querySelector('.toast');
@@ -13,6 +39,31 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'), 2600);
 }
 const zar = n => n === 0 ? 'R0' : 'R' + n.toLocaleString('en-ZA');
+
+/* ---------- kid-friendly touches ---------- */
+const PRAISE = ['you got it! 🎉','yes! high five! ✋','brilliant! ⭐','nice one! 🙌','that is the brain! 🧠','boom! 💥','superb! 🦄','you cracked it! 🔓'];
+const CHEER = ['keep going, you are doing great','every try makes your brain stronger','mistakes are just practice in disguise','slow and steady still wins — your pace is the right pace','asking "try again" is what clever learners do'];
+function pickA(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function confetti(){
+  let box = document.getElementById('confetti');
+  if(!box){ box = document.createElement('div'); box.id='confetti'; document.body.appendChild(box); }
+  const bits = ['🎉','⭐','✏️','📓','🌟','🎈','🧠','💡','🚌','🍎'];
+  for(let i=0;i<26;i++){
+    const s = document.createElement('i');
+    s.textContent = bits[Math.floor(Math.random()*bits.length)];
+    s.style.left = Math.random()*96 + 'vw';
+    s.style.animationDuration = (1.6 + Math.random()*1.6) + 's';
+    s.style.animationDelay = (Math.random()*0.4) + 's';
+    s.style.fontSize = (14 + Math.random()*14) + 'px';
+    box.appendChild(s);
+    setTimeout(()=>s.remove(), 3600);
+  }
+}
+
+function buddySay(emoji, text){
+  return `<div class="buddysay"><span class="bs-emoji">${emoji}</span><span class="bs-bubble">${text}</span></div>`;
+}
 
 async function render(){
   const site = await loadSite();
@@ -30,42 +81,44 @@ async function render(){
 /* ---------- home ---------- */
 function renderHome(site){
   const s = site.subjects;
-  const cat = (title, arr, key) => `
-    <div class="card"><h3>${title}</h3>
+  const cat = (title, arr, key, icon) => `
+    <div class="card"><h3>${icon} ${title}</h3>
       <div class="chips">${arr.slice(0,4).map(x=>`<span class="chip">${x}</span>`).join('')}</div>
       <div style="margin-top:10px"><a class="btn ghost" href="#" data-go="offerings" data-cat="${key}">see all ${arr.length}</a></div>
     </div>`;
+  const canDoIcons = ['🐢','🔁','💡','🕒','🧭','📈','🤝','🏠'];
   $app.innerHTML = `
-    <div class="hero">
+    <div class="hero doodles">
+      <span class="doodle">✏️</span><span class="doodle">🎒</span><span class="doodle">📐</span><span class="doodle">🍎</span><span class="doodle">🚌</span>
       <h1>${site.brand.tagline}</h1>
       <div class="tag">${site.brand.name}</div>
       <p class="phi">${site.brand.philosophy}</p>
       <div class="cta-row">
-        <a class="btn" href="#" data-go="learner">build a learner profile</a>
-        <a class="btn green" href="#" data-go="quiz">try a lesson</a>
+        <a class="btn" href="#" data-go="learner">🎒 build a learner profile</a>
+        <a class="btn green" href="#" data-go="quiz">🚀 try a lesson</a>
       </div>
     </div>
     <div class="grid">
-      <div class="card"><h3>learn at your own pace</h3><p>repeat lessons without embarrassment. watch as many times as needed.</p></div>
-      <div class="card"><h3>short lessons</h3><p>shorter lessons rather than long classroom sessions. work when you have the time.</p></div>
-      <div class="card"><h3>many ways in</h3><p>video, audio, visuals and practical activities. when something doesn't land, we try another way.</p></div>
-      <div class="card"><h3>no shame learning</h3><p>never "fail". always "try again". "i haven't understood it yet" — not "i'm stupid".</p></div>
+      <div class="card"><h3>🐢 learn at your own pace</h3><p>repeat lessons without embarrassment. watch as many times as needed.</p></div>
+      <div class="card"><h3>⏱ short lessons</h3><p>shorter lessons rather than long classroom sessions. work when you have the time.</p></div>
+      <div class="card"><h3>🧩 many ways in</h3><p>video, audio, visuals and practical activities. when something doesn't land, we try another way.</p></div>
+      <div class="card"><h3>💛 no shame learning</h3><p>never "fail". always "try again". "i haven't understood it yet" — not "i'm stupid".</p></div>
     </div>
     <div class="section">
       <h2>what a learner can do here</h2>
       <div class="grid">
         ${["learn at their own pace","repeat lessons freely","get extra explanations","complete work when they have time","follow a personalised pathway","track their own progress","get tutor support when required","learn from home — no daily travel costs"]
-          .map(x=>`<div class="card"><p>${x}</p></div>`).join('')}
+          .map((x,i)=>`<div class="card"><h3>${canDoIcons[i%canDoIcons.length]}</h3><p>${x}</p></div>`).join('')}
       </div>
     </div>
     <div class="section">
       <h2>beyond school subjects</h2>
       <p class="sub">an alternative education ecosystem, not just lessons.</p>
       <div class="grid">
-        ${cat('academic', s.academic, 'academic')}
-        ${cat('personal development', s.personalDevelopment, 'personalDevelopment')}
-        ${cat('financial education', s.financialEducation, 'financialEducation')}
-        ${cat('future skills', s.futureSkills, 'futureSkills')}
+        ${cat('academic', s.academic, 'academic', '📚')}
+        ${cat('personal development', s.personalDevelopment, 'personalDevelopment', '🌟')}
+        ${cat('financial education', s.financialEducation, 'financialEducation', '💰')}
+        ${cat('future skills', s.futureSkills, 'futureSkills', '🤖')}
       </div>
     </div>
     <div class="section">
@@ -87,7 +140,7 @@ const PQUESTIONS = [
   {k:'struggle', q:'which subjects do you struggle with? (choose all that apply)', opts:['Mathematics','English','Science','Technology','Business Studies','Reading','Writing','Exams'], multi:true},
   {k:'style', q:'how do you prefer learning? (choose all that work for you)', opts:['Watching videos','Listening','Reading','Doing practical activities'], multi:true},
   {k:'focus', q:'how long can you comfortably concentrate?', opts:['5–10 minutes','10–20 minutes','20–40 minutes','40+ minutes']},
-  {k:'hard', q:'what normally makes learning difficult?', opts:['Going too fast','Too much at once','Not enough explanation','Getting rushed','Fear of getting it wrong','Nothing specific']},
+  {k:'hard', q:'what normally makes learning difficult? (choose all that apply)', opts:['Going too fast','Too much at once','Not enough explanation','Getting rushed','Fear of getting it wrong','Nothing specific'], multi:true},
   {k:'strength', q:'what are you good at?', type:'text', ph:'e.g. explaining things to friends, building things, drawing'},
   {k:'goal', q:'what do you want to get better at this year?', type:'text', ph:'e.g. maths, confidence, reading'},
 ];
@@ -118,11 +171,28 @@ function renderLearner(site){
   if(profile){ return renderProfileCard(site); }
   const draft = loadDraft();
   $app.innerHTML = `
-    <div class="hero"><h1>build your learner profile</h1>
-      <p class="phi">we don't just ask "what grade are you in?". we ask how you learn — so the platform can adapt to you.</p>
+      <div class="hero doodles">
+        <span class="doodle">✏️</span><span class="doodle">🎒</span><span class="doodle">📐</span><span class="doodle">🌟</span><span class="doodle">🧠</span>
+        <h1>build your learner profile</h1>
+        <p class="phi">we don't just ask "what grade are you in?". we ask how you learn — so the platform can adapt to you.</p>
       ${chosenTier?`<p class="sub">you're signing up for the <b>${chosenTier.name}</b> tier (${zar(chosenTier.price)}/month) — the profile tells us where to start.</p>`:''}
     </div>
     <div class="card" style="max-width:640px;margin:22px auto 0">
+      <div class="q">
+        <label>🎒 pick your learning buddy</label>
+        <p class="dim" style="margin-bottom:10px">they sit with you in every lesson. pick one — you can change it any time.</p>
+        <div class="buddy-grid">${CHARACTERS.map(c=>`
+          <button type="button" class="buddy-card${draft.buddy===c.id?' sel':''}" data-buddy="${c.id}">
+            <span class="buddy-emoji" style="background:linear-gradient(135deg,${c.grad[0]},${c.grad[1]})">${c.emoji}</span>
+            <span class="buddy-name">${c.name}</span>
+            <span class="buddy-line">${c.line}</span>
+          </button>`).join('')}</div>
+      </div>
+      <div class="q">
+        <label>🎨 pick your accent colour</label>
+        <div class="dots">${ACCENTS.map(c=>`
+          <button type="button" class="dot${(draft.accent||'')===c?' sel':''}" style="background:${c}" data-accent="${c}" aria-label="accent colour ${c}"></button>`).join('')}</div>
+      </div>
       ${PQUESTIONS.map((q,i)=>{
         const val = draft[q.k] !== undefined ? draft[q.k] : null;
         return `
@@ -136,7 +206,7 @@ function renderLearner(site){
             : `<input type="text" id="in_${q.k}" placeholder="${q.ph||''}" value="${val||''}">`}
         </div>`;}).join('')}
       <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn" id="saveProfile">create my profile</button>
+        <button class="btn" id="saveProfile">🚀 create my profile</button>
         <button class="btn ghost" id="skipProfile">skip for now</button>
       </div>
     </div>`;
@@ -156,6 +226,22 @@ function renderLearner(site){
   $app.querySelectorAll('input[type=text]').forEach(el=>{
     el.addEventListener('input', collectDraftFromDOM);
   });
+  $app.querySelectorAll('.buddy-card').forEach(b=>{
+    b.onclick = ()=>{
+      $app.querySelectorAll('.buddy-card').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      const d = loadDraft(); d.buddy = b.dataset.buddy; saveDraft(d);
+    };
+  });
+  $app.querySelectorAll('.dot').forEach(b=>{
+    b.onclick = ()=>{
+      const already = b.classList.contains('sel');
+      $app.querySelectorAll('.dot').forEach(x=>x.classList.remove('sel'));
+      applyAccent(already ? null : b.dataset.accent);
+      b.classList.toggle('sel', !already);
+      const d = loadDraft(); d.accent = accent; saveDraft(d);
+    };
+  });
   document.getElementById('skipProfile').onclick = ()=>{ go('quiz'); };
   document.getElementById('saveProfile').onclick = ()=>{
     collectDraftFromDOM();
@@ -173,7 +259,8 @@ function renderLearner(site){
         profile = p;
         sessionStorage.setItem('btc_profile', JSON.stringify(p));
         sessionStorage.removeItem('btc_draft');
-        toast('profile saved');
+        confetti();
+        toast('🎉 profile saved — welcome aboard!');
         renderProfileCard(site);
       })
       .catch(err=>{
@@ -193,6 +280,7 @@ async function renderProfileCard(site){
     data = {summary:'(offline — saved profile shown from this device)', tags:['saved'], offline:true};
   }
   const a = profile.answers || {};
+  const myChar = charById(a.buddy);
   const picked = (label, v) => {
     if(!v || (Array.isArray(v) && !v.length)) return '';
     const vals = Array.isArray(v) ? v : [v];
@@ -200,7 +288,10 @@ async function renderProfileCard(site){
       <span class="dim">${label}</span><span style="text-align:right;max-width:60%">${vals.join(', ')}</span></div>`;
   };
   $app.innerHTML = `
-    <div class="hero"><h1>learning profile</h1>
+    <div class="hero">
+      ${myChar?`<div class="hero-avatar" style="background:linear-gradient(135deg,${myChar.grad[0]},${myChar.grad[1]})">${myChar.emoji}</div>
+      <p class="sub" style="margin-top:10px">your buddy: <b>${myChar.name}</b> — ${myChar.line}</p>`:''}
+      <h1>learning profile</h1>
       ${chosenTier?`<p class="sub">tier: <b>${chosenTier.name}</b> — ${zar(chosenTier.price)}/month</p>`:''}
     </div>
     <div class="card" style="max-width:640px;margin:0 auto">
@@ -226,6 +317,7 @@ async function renderProfileCard(site){
     </div>`;
   document.getElementById('newProfile').onclick = ()=>{
     profile = null; sessionStorage.removeItem('btc_profile'); sessionStorage.removeItem('btc_draft');
+    applyAccent(null);
     fetch('/api/profile',{method:'DELETE'}).catch(()=>{});
     render();
   };
@@ -252,6 +344,54 @@ const MODALITIES = [
   {id:'audio',     icon:'🎧', label:'hear it'},
   {id:'kinesthetic', icon:'✋', label:'do it'},
 ];
+
+/* ---------- correction voiceover (elevenlabs male voice via /api/tts) ---------- */
+let correctionAudio = null;   // one shared <audio> for all correction buttons
+let correctionPlaying = null; // button element currently playing
+
+function stopCorrectionAudio(){
+  if(correctionAudio){ correctionAudio.pause(); correctionAudio = null; }
+  if(correctionPlaying){
+    const icon = correctionPlaying.querySelector('.sayicon');
+    if(icon) icon.textContent = '🔊';
+    correctionPlaying.classList.remove('speaking');
+    correctionPlaying = null;
+  }
+}
+
+function playCorrection(btn){
+  const key = btn.dataset.say;
+  if(correctionPlaying === btn){ stopCorrectionAudio(); return; } // tap again = stop
+  stopCorrectionAudio();
+  const icon = btn.querySelector('.sayicon');
+  const setIcon = t => { if(icon) icon.textContent = t; };
+  correctionPlaying = btn;
+  btn.classList.add('speaking');
+  setIcon('⏳');
+  const finish = ()=>{ if(correctionPlaying===btn) stopCorrectionAudio(); };
+  const fallbackSpeak = ()=>{ // device voice if network/voice engine fails
+    setIcon('📣');
+    const textEl = btn.querySelector('.saytext');
+    try{
+      const u = new SpeechSynthesisUtterance((textEl ? textEl.textContent : '').slice(0, 600));
+      u.onend = finish; u.onerror = finish;
+      speechSynthesis.speak(u);
+    }catch(e){ finish(); }
+  };
+  try{
+    fetch(`/api/tts/${encodeURIComponent(key)}`)
+      .then(r=>{ if(!r.ok) throw new Error('tts '+r.status); return r.blob(); })
+      .then(blob=>{
+        if(correctionPlaying !== btn) return; // user tapped away mid-load
+        correctionAudio = new Audio(URL.createObjectURL(blob));
+        correctionAudio.onended = finish;
+        correctionAudio.onerror = fallbackSpeak;
+        setIcon('⏸');
+        return correctionAudio.play().catch(fallbackSpeak);
+      })
+      .catch(fallbackSpeak);
+  }catch(e){ fallbackSpeak(); }
+}
 
 function modalityBody(q, m){
   if(m==='visual') return q.visual || '';
@@ -299,15 +439,19 @@ function paintQuiz(site){
   if(done){
     const correct = qs.filter(q=>q.correct).length;
     const attempts = qs.reduce((a,q)=>a+q.attempts,0);
+    confetti();
+    const endChar = charById((profile&&profile.answers||{}).buddy);
     $app.innerHTML = `
-      <div class="hero"><h1>lesson complete</h1></div>
+      <div class="hero"><h1>🎉 lesson complete!</h1></div>
       <div class="done" style="max-width:560px;margin:0 auto">
+        ${endChar?`<div style="font-size:56px;line-height:1">${endChar.emoji}</div>
+        ${buddySay(endChar.emoji, correct===qs.length ? 'PERFECT lesson! you are on fire! 🔥' : 'you worked through every single one. proud of you! 💪')}`:''}
         <div class="big">${correct}/${qs.length}</div>
         <p class="dim" style="margin-top:6px">first-try correct: ${correct} · total tries: ${attempts}</p>
         <p style="margin-top:12px">every question was eventually understood. that's the point. no score is final here — "try again" always leads to understanding.</p>
         <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="btn" id="againQuiz">try a fresh lesson</button>
-          <a class="btn ghost" href="#" data-go="parent">see the parent view</a>
+          <button class="btn" id="againQuiz">🔄 try a fresh lesson</button>
+          <a class="btn ghost" href="#" data-go="parent">📊 see the parent view</a>
         </div>
       </div>`;
     document.getElementById('againQuiz').onclick = async ()=>{
@@ -317,16 +461,18 @@ function paintQuiz(site){
   }
   const q = qs[quizState.idx];
   const pct = Math.round((quizState.idx / qs.length) * 100);
+  const myChar = charById((profile&&profile.answers||{}).buddy);
   if(!MODALITIES.some(m=>m.id===modality)) modality='visual';
   $app.innerHTML = `
     <div style="max-width:640px;margin:0 auto">
       <div class="quiz-top">
-        <span class="dim">question ${quizState.idx+1} of ${qs.length}</span>
-        <span class="dim">${quizState.topic}</span>
+        <span class="dim">📝 question ${quizState.idx+1} of ${qs.length}</span>
+        <span class="dim">${myChar?`${myChar.emoji} ${myChar.name} is with you`:`${quizState.topic}`}</span>
       </div>
       <div class="progress"><div style="width:${pct}%"></div></div>
+      ${myChar ? buddySay(myChar.emoji, quizState.idx===0 ? 'hi! i\'m '+myChar.name+'. we\'ll take this one step at a time. 😊' : pickA(['take your time — no rush here.','read it again slowly. i\'m right here.','you\'ve got this. pick the one that feels right.'])) : ''}
       <div class="card">
-        <div class="qq">${q.q}</div>
+        <div class="qq">🤔 ${q.q}</div>
         <p class="dim">${q.context||''}</p>
         <div class="modtabs">
           ${MODALITIES.map(m=>`
@@ -342,19 +488,29 @@ function paintQuiz(site){
               data-i="${i}" ${q.correct || (q.answeredThisRound && !q.wrong) ? 'disabled':''}>${o}</button>`).join('')}
         </div>
         ${q.rewrites && q.rewrites.length ? `<div class="retry">
-          <h4>let's try that another way</h4>
-          <p class="dim">you haven't mastered this concept yet. that's okay. here it is, explained differently:</p>
+          <h4>🧩 let's try that another way</h4>
+          <p class="dim">tap any explanation to hear it read aloud:</p>
           ${q.rewrites.map((txt,i)=>`
-            <div class="method"><b>${(quizState.methodNames||[])[i]||('method '+(i+1))}</b><br><span style="font-size:14px">${txt}</span></div>`).join('')}
+            <button type="button" class="method saybtn" data-say="${q.id}:rw:${i}" aria-label="play correction ${i+1}">
+              <span class="sayicon" aria-hidden="true">🔊</span>
+              <span class="saytext"><b>${(quizState.methodNames||[])[i]||('method '+(i+1))}</b><br><span style="font-size:14px">${txt}</span></span>
+            </button>`).join('')}
+          ${q.answeredThisRound && !q.correct && q.answerIndex>-1 && (q.options||[])[q.answerIndex]!==undefined ? `
+            <button type="button" class="method saybtn whybtn" data-say="${q.id}:opt:${q.answerIndex}" aria-label="play why this option was wrong">
+              <span class="sayicon" aria-hidden="true">🔊</span>
+              <span class="saytext"><b>why "${q.options[q.answerIndex]}" isn't it</b><br><span style="font-size:14px">hear where that choice went wrong</span></span>
+            </button>` : ''}
         </div>`:''}
-        ${q.correct ? `<div class="retry" style="border-color:var(--brand2);background:rgba(34,211,167,.07)">
-          <h4 style="color:var(--brand2)">you've got it</h4><p class="dim">${q.praise||'nice work. on to the next one.'}</p></div>`:''}
+      ${q.correct ? `<div class="yay">
+          <h4>🎉 ${q.praise || pickA(PRAISE)}</h4>
+          ${myChar ? buddySay(myChar.emoji, pickA(['we did it! next one?','see? your brain knew it.','high five! i knew you had this.']) ) : ''}
+          <p class="dim">${pickA(CHEER)}</p></div>`:''}
       </div>
       <div style="margin-top:16px;text-align:center;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         ${q.correct
-          ? `<button class="btn" id="nextQ">${quizState.idx+1>=qs.length?'finish lesson':'next question'}</button>`
+          ? `<button class="btn" id="nextQ">${quizState.idx+1>=qs.length?'🏁 finish lesson':'➡️ next question'}</button>`
           : q.answeredThisRound
-            ? `<button class="btn green" id="retryQ">try again — you've got this</button>
+            ? `<button class="btn green" id="retryQ">🔄 try again — you've got this</button>
                <button class="btn ghost" id="nextQ">skip for now</button>`
             : ''}
       </div>
@@ -367,6 +523,9 @@ function paintQuiz(site){
     };
   });
   paintAudio(q, modality);
+  $app.querySelectorAll('.saybtn').forEach(b=>{
+    b.onclick = ()=>playCorrection(b);
+  });
   $app.querySelectorAll('.ans').forEach(b=>{
     b.onclick = ()=>{
       const i = +b.dataset.i;
@@ -377,7 +536,7 @@ function paintQuiz(site){
           q.answeredThisRound = true;
           q.correct = !!res.correct; q.wrong = !res.correct;
           q.answerIndex = i; q.praise = res.praise;
-          if(res.correct) q.correctCount = (q.correctCount||0)+1;
+          if(res.correct){ q.correctCount = (q.correctCount||0)+1; confetti(); }
           else { q.attempts = (q.attempts||0)+1; q.rewrites = [...(q.rewrites||[]), ...(res.rewrites||[])]; }
           paintQuiz(site);
         })
@@ -385,9 +544,9 @@ function paintQuiz(site){
     };
   });
   const nx = document.getElementById('nextQ');
-  if(nx) nx.onclick = ()=>{ quizState.idx++; paintQuiz(site); };
+  if(nx) nx.onclick = ()=>{ stopCorrectionAudio(); quizState.idx++; paintQuiz(site); };
   const rq = document.getElementById('retryQ');
-  if(rq) rq.onclick = ()=>{ q.answeredThisRound = false; q.wrong = false; q.answerIndex = -1; paintQuiz(site); };
+  if(rq) rq.onclick = ()=>{ stopCorrectionAudio(); q.answeredThisRound = false; q.wrong = false; q.answerIndex = -1; paintQuiz(site); };
 }
 
 /* ---------- parent ---------- */
@@ -527,16 +686,9 @@ function renderOfferings(site){
         <div class="card"><h3>✋ do it</h3><p>hands-on activities: paper folds, coins, acting it out.</p></div>
       </div>
     </div>
-    <div class="section">
-      <h2>beyond the tiers</h2>
-      <table>
-        <tr><th>extra offering</th><th>pricing</th></tr>
-        ${site.revenueStreams.filter(r=>!site.tiers.some(t=>t.name===r.stream)).map(r=>`<tr><td>${r.stream}</td><td>${r.zar}</td></tr>`).join('')}
-      </table>
-    </div>
     <div class="cta-row" style="text-align:center">
-      <a class="btn" href="#" data-go="learner">match these to my learner</a>
-      <a class="btn green" href="#" data-go="pricing">see tier pricing</a>
+      <a class="btn" href="#" data-go="learner">🎒 match these to my learner</a>
+      <a class="btn green" href="#" data-go="pricing">💰 see tier pricing</a>
     </div>
     <div class="note">demo catalogue for a test build — subject availability grows with each phase.</div>
   `;
@@ -570,4 +722,6 @@ document.querySelectorAll('.navlink').forEach(a=>{
 });
 // restore chosen tier on reload
 try { chosenTier = JSON.parse(sessionStorage.getItem('btc_tier') || 'null'); } catch(e){ chosenTier = null; }
+// restore accent colour: saved profile wins, session fallback otherwise
+try { applyAccent((profile&&profile.answers&&profile.answers.accent) || sessionStorage.getItem('btc_accent')); } catch(e){}
 render();

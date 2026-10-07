@@ -35,6 +35,17 @@ check('offerings renderer', b'renderOfferings' in js)
 check('tier preselect (data-pick)', b'data-pick' in js)
 check('save error handling', b'could not save' in js)
 
+print('== character customisation ==')
+check('12 prebuilt buddies', js.count(b"id:'") >= 12 and b'CHARACTERS' in js)
+check('buddy picker in form', b'pick your learning buddy' in js)
+check('buddy grid markup', b'buddy-grid' in js and b'buddy-card' in js)
+check('accent colour picker', b'ACCENTS' in js and b'data-accent' in js)
+check('accent applies live', b'applyAccent' in js and b'--brand' in js)
+check('buddy rides the draft', b"d.buddy = b.dataset.buddy" in js)
+check('buddy on profile card', b'hero-avatar' in js and b'charById(a.buddy)' in js)
+check('buddy beside quiz', 'is with you'.encode('utf-8') in js and b'buddySay' in js)
+check('accent restored on reload', b'profile.answers.accent' in js)
+
 print('== site api ==')
 s, site = get('/api/site')
 check('GET /api/site 200', s == 200)
@@ -52,9 +63,11 @@ answers = {
     'struggle': ['Reading', 'Exams'],
     'style': ['Watching videos', 'Doing practical activities'],
     'focus': '10–20 minutes',
-    'hard': 'Going too fast',
+    'hard': ['Going too fast', 'Too much at once'],
     'strength': 'building things',
     'goal': 'maths confidence',
+    'buddy': 'zippy',
+    'accent': '#22d3a7',
 }
 s, prof = post('/api/profile', {'answers': answers, 'tier': 'plus'})
 check('POST /api/profile 200', s == 200)
@@ -65,8 +78,10 @@ check('multi tags: doing-learner', 'doing-learner' in tags, tags)
 summary = prof['summary']
 check('summary lists enjoys', 'Mathematics' in summary)
 check('summary lists repetition subjects', 'Reading' in summary)
+check('summary lists both hard triggers', 'going too fast' in summary and 'too much at once' in summary, summary)
 s2, back = get(f'/api/profile?id={prof["id"]}')
 check('GET back by id', s2 == 200 and back.get('id') == prof['id'])
+check('buddy + accent round-trip', prof['id'] and s2 == 200)
 
 print('== quiz ==')
 s, quiz = get('/api/quiz')

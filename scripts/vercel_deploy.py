@@ -11,6 +11,8 @@ ROOT = '/opt/data/learning-app'
 FILES = [
     ('public/index.html', 'text/plain; charset=utf-8'),
     ('public/app.js',     'text/plain; charset=utf-8'),
+    ('public/auth.js',    'text/plain; charset=utf-8'),
+    ('public/vendor/supabase.umd.js', 'text/plain; charset=utf-8'),
     ('public/style.css',  'text/plain; charset=utf-8'),
     ('api/index.py',      'text/x-python'),
     ('data/site.json',    'application/json'),
